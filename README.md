@@ -1,11 +1,40 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/lex-logo.png">
-    <img src="docs/logo/lex-logo-light.png" alt="Lex" width="340">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/lex-logo.png" />
+    <source media="(prefers-color-scheme: light)" srcset="docs/logo/lex-logo-light.png" />
+    <img src="docs/logo/lex-logo-light.png" alt="Lex" width="340" />
   </picture>
 </p>
 
-<p align="center"><strong>Your code remembers the AI conversations that talked about it.</strong></p>
+<p align="center">
+  <strong>Your code remembers the AI conversations that talked about it.</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/lukaskellerstein/lex"><img src="https://img.shields.io/badge/version-0.1.0-blue?style=flat-square" alt="Version" /></a>
+  <a href="https://neovim.io/"><img src="https://img.shields.io/badge/Neovim-0.10+-57A143?style=flat-square&logo=neovim&logoColor=white" alt="Neovim" /></a>
+  <a href="https://www.lua.org/"><img src="https://img.shields.io/badge/Lua-5.1_LuaJIT-2C2D72?style=flat-square&logo=lua&logoColor=white" alt="Lua" /></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.1-FBF0DF?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
+  <a href="https://github.com/folke/snacks.nvim"><img src="https://img.shields.io/badge/snacks.nvim-picker-8FB4F0?style=flat-square" alt="snacks.nvim" /></a>
+  <br />
+  <a href="https://www.anthropic.com/claude-code"><img src="https://img.shields.io/badge/Claude_Code-hook-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code" /></a>
+  <a href="https://github.com/openai/codex"><img src="https://img.shields.io/badge/Codex-hook-412991?style=flat-square&logoColor=white" alt="Codex" /></a>
+  <a href="https://opencode.ai/"><img src="https://img.shields.io/badge/OpenCode-plugin-EACB4A?style=flat-square&logoColor=black" alt="OpenCode" /></a>
+  <a href="https://github.com/tmux/tmux"><img src="https://img.shields.io/badge/tmux-optional-1BB91F?style=flat-square&logo=tmux&logoColor=white" alt="tmux" /></a>
+  <a href="#the-contract"><img src="https://img.shields.io/badge/tests-490_passing-brightgreen?style=flat-square" alt="Tests" /></a>
+  <a href="#licence"><img src="https://img.shields.io/badge/licence-MIT-green?style=flat-square" alt="Licence" /></a>
+</p>
+
+<p align="center">
+  <a href="#set-it-up">Set It Up</a> &middot;
+  <a href="#use-it">Use It</a> &middot;
+  <a href="#what-the-marks-mean">The Marks</a> &middot;
+  <a href="#commands">Commands</a> &middot;
+  <a href="#configure-it">Configure</a> &middot;
+  <a href="#how-it-works">How It Works</a> &middot;
+  <a href="#status">Status</a>
+</p>
 
 ---
 
