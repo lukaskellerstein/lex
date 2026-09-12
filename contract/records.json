@@ -1,0 +1,63 @@
+[
+  {
+    "repo": "/Users/lukas/Projects/aaa",
+    "path": "/Users/lukas/Projects/aaa/.worktrees/lukas-44/src/auth.ts",
+    "file": "src/auth.ts",
+    "from": 12,
+    "to": 15,
+    "lang": "typescript",
+    "index": 1,
+    "of": 5,
+    "body": "export function login(user: User) {\n  const token = issue(user);   // \"why\" & <T>\n  return token;\n}",
+    "head": "export function login(user: User) {",
+    "tail": "}",
+    "hash": "8e0741ca",
+    "prompt": "Look at these places, then the folder."
+  },
+  {
+    "repo": "/Users/lukas/Projects/aaa",
+    "path": "/Users/lukas/Projects/aaa/lua/lex/place.lua",
+    "file": "lua/lex/place.lua",
+    "from": 7,
+    "to": 8,
+    "lang": "lua",
+    "index": 2,
+    "of": 5,
+    "body": "  local s = \"</lex-place>\"\n",
+    "head": "local s = \"</lex-place>\"",
+    "tail": "local s = \"</lex-place>\"",
+    "hash": "c3c17262",
+    "prompt": "Look at these places, then the folder."
+  },
+  {
+    "repo": "/Users/lukas/Projects/aaa",
+    "path": "/Users/lukas/Projects/aaa/docs",
+    "dir": "docs",
+    "index": 3,
+    "of": 5,
+    "prompt": "Look at these places, then the folder."
+  },
+  {
+    "repo": "/Users/lukas/Projects/aaa",
+    "path": "/Users/lukas/Projects/aaa/we\"ird & co/README.md",
+    "file": "we\"ird & co/README.md",
+    "index": 4,
+    "of": 5,
+    "prompt": "Look at these places, then the folder."
+  },
+  {
+    "repo": "/Users/lukas/Projects/other",
+    "path": "/Users/lukas/Projects/other/main.go",
+    "file": "main.go",
+    "from": 3,
+    "to": 3,
+    "lang": "go",
+    "index": 7,
+    "of": 5,
+    "body": "\tfmt.Println(\"hi, wörld\")",
+    "head": "fmt.Println(\"hi, wörld\")",
+    "tail": "fmt.Println(\"hi, wörld\")",
+    "hash": "f7788f39",
+    "prompt": "Look at these places, then the folder."
+  }
+]

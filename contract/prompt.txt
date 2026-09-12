@@ -1,0 +1,25 @@
+Look at these places, then the folder.
+
+<lex-place n="1" path="/Users/lukas/Projects/aaa/.worktrees/lukas-44/src/auth.ts" repo="/Users/lukas/Projects/aaa" file="src/auth.ts" lines="12-15" lang="typescript">
+export function login(user: User) {
+  const token = issue(user);   // "why" & <T>
+  return token;
+}
+</lex-place>
+
+<lex-place-1 path="/Users/lukas/Projects/aaa/lua/lex/place.lua" repo="/Users/lukas/Projects/aaa" file="lua/lex/place.lua" lines="7-8" lang="lua">
+  local s = "</lex-place>"
+
+</lex-place-1>
+<lex-place path="/Users/lukas/Projects/aaa/docs" repo="/Users/lukas/Projects/aaa" dir="docs"/>
+<lex-place path="/Users/lukas/Projects/aaa/we&quot;ird &amp; co/README.md" repo="/Users/lukas/Projects/aaa" file="we&quot;ird &amp; co/README.md"/>
+<lex-place path="/Users/lukas/Projects/aaa/bad.ts" repo="/Users/lukas/Projects/aaa" file="bad.ts" lines="x-y">
+nope
+</lex-place>
+<lex-place-2 path="/Users/lukas/Projects/aaa/bad2.ts" repo="/Users/lukas/Projects/aaa" file="bad2.ts" lines="1-1">
+nope
+</lex-place>
+<lex-place n="7" path="/Users/lukas/Projects/other/main.go" repo="/Users/lukas/Projects/other" file="main.go" lines="3-3" lang="go">
+	fmt.Println("hi, wörld")
+</lex-place>
+Why does login retry twice?

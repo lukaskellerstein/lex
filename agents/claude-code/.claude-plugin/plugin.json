@@ -1,0 +1,9 @@
+{
+  "name": "lex",
+  "version": "0.1.0",
+  "description": "Remembers which conversations talked about a place in your code. The writer half of lex.nvim.",
+  "author": {
+    "name": "Lukas Kellerstein"
+  },
+  "keywords": ["neovim", "lex", "hooks"]
+}

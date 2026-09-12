@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nvim -l \"${CLAUDE_PLUGIN_ROOT}/hook.lua\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
