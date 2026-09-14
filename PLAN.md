@@ -679,9 +679,20 @@ readable.
    not the buffer's: go to the agent, go to the lines, forget this
    conversation, forget only this place.
 
+   **Forgetting keeps the list open** (Lukas, 2026-09-14): the confirm
+   draws over it, Cancel leaves it as it was, and Forget redraws it in
+   place without what went (`picker.opts.items`, then `refresh`), closing
+   it only when nothing is left. It used to close first and reopen after.
+   `d` forgets every row `Tab` selected, with one confirm that names them
+   all and one store call; the right-click item stays the clicked row.
+
    **The keys are on screen** (Lukas, 2026-09-14): the list's bottom border
-   reads `Enter open agent  g go to lines  d forget  / search  ? all keys`,
-   `Enter` rather than vim's `<CR>`, which Lukas did not recognise. The
+   reads `[Enter] open agent  [g] go to lines  [d] forget  [Tab] select
+   [/] search  [?] all keys`, in 89 cells: brackets so a key reads as a
+   key, and no padding inside them, which took six keys to 102 cells in a
+   list about 98 wide. `Enter` rather than vim's `<CR>`, which Lukas did
+   not recognise. `Tab` is listed only because `d` now acts on the
+   selection. The
    picker opens on the rows (`focus = "list"`), not in the search: typed
    into the search, `g` and `d` only searched, and the first footer had to
    say "Esc, then" in front of them. As many keys as fit, the last dropped first, refitted on
