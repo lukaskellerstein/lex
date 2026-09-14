@@ -205,8 +205,9 @@ it happened, turn by turn, with the places each prompt carried.
 | `q` | close |
 | `?` | every key, snacks' own too |
 
-The bottom border of the list shows these keys, as many as fit. The list opens
-on the rows, not in the search, so every key works at once.
+The bottom border of the list shows every key above except `q` and `?`, as many
+as fit. The list opens on the rows, not in the search, so every key works at
+once.
 
 `d` removes Lex's memory of a conversation. It never touches the agent's own
 history.
