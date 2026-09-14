@@ -258,33 +258,17 @@ local function cells(footer)
   return n
 end
 local full = picker.footer()
-eq(full[2][1], " <CR> ", "picker: the footer starts with <CR>")
+eq(full[2][1], " Enter ", "picker: the footer starts with Enter")
 eq(cells(picker.footer(cells(full))), cells(full), "picker: the whole footer when it fits")
 local cut = picker.footer(cells(full) - 1)
-eq(cut[#cut - 1][1], " forget ", "picker: the last key dropped first")
-eq(picker.footer(5), nil, "picker: no footer when not even <CR> fits")
+eq(cut[#cut - 1][1], " search ", "picker: the last key dropped first")
+eq(picker.footer(5), nil, "picker: no footer when not even Enter fits")
 local default = { layout = { box = "horizontal", { box = "vertical", border = true, title = "{title} {live} {flags}", { win = "input", border = "bottom" }, { win = "list", border = "none" } }, { win = "preview", border = true } } }
 picker.with_keys(default)
 eq(default.layout[1].lex_keys, true, "picker: the keys on the frame that carries the title")
 local ivy = { layout = { box = "vertical", border = "top", title = " {title} {live} {flags}", { win = "input", border = "bottom" }, { box = "horizontal", { win = "list", border = "none" }, { win = "preview", border = "left" } } } }
 picker.with_keys(ivy)
 eq({ ivy.layout.lex_keys, ivy.layout[2][1].lex_keys }, {}, "picker: no keys where nothing has a bottom edge")
-eq(picker.last_answer(r.records[1]), "Because the gateway drops calls.", "picker: the last answer from the transcript")
-eq(picker.last_answer(r.records[4]), nil, "picker: no answer when the transcript is gone")
--- the newest answer wins, and only the tail of a long transcript is read
-local many = {}
-for i = 1, 4000 do
-  many[i] = ('{"type":"assistant","message":{"content":[{"type":"text","text":"answer %d"}]}}'):format(i)
-end
-vim.fn.writefile(many, tmp .. "/long.jsonl")
-local long = vim.deepcopy(r.records[1])
-long.transcript = tmp .. "/long.jsonl"
-eq(picker.last_answer(long), "answer 4000", "picker: the newest answer in a long transcript")
-local called, answer = false, nil
-local got, pending = picker.last_answer(long, function(text)
-  called, answer = true, text
-end)
-eq({ got, pending, called, answer }, { "answer 4000", false, true, "answer 4000" }, "picker: a file agent answers at once, and the callback too")
 
 -- working: the state file says so, and the process lives
 local function set_state(session, state)
@@ -464,6 +448,48 @@ eq(#links.repo(main).records, before - 3, "forget: the store shrank by three in 
 eq(links.forget_session(main, "s-nothing-like-this"), 0, "forget: an unknown session removes nothing")
 marks.refresh(buf)
 eq(marks.state(buf).count, 7, "forget: the file is back to the seven it had")
+
+-- forgetting a file: each conversation loses only its places in that file,
+-- one with nothing left is gone, and the folder place above stays
+vim.fn.writefile({ "# guide" }, tmp .. "/main/docs/guide.md")
+vim.fn.writefile({ "# other" }, tmp .. "/main/docs/other.md")
+local guide = { file = "docs/guide.md", path = main .. "/docs/guide.md" }
+f = assert(io.open(store.file(main), "a"))
+for _, over in ipairs({
+  vim.tbl_extend("force", guide, { from = 1, to = 1, session = "s-two-files", at = now - 50, prompt = "is the guide right?" }),
+  vim.tbl_extend("force", guide, { from = 1, to = 1, session = "s-two-files", at = now - 40, prompt = "and now?" }),
+  { file = "docs/other.md", path = main .. "/docs/other.md", from = 1, to = 1, session = "s-two-files", at = now - 40, prompt = "and now?" },
+  vim.tbl_extend("force", guide, { session = "s-guide-only", at = now - 30 }),
+  { dir = "docs", session = "s-docs-dir", at = now - 20 },
+}) do
+  f:write(record(over), "\n")
+end
+f:close()
+links.refresh(r)
+local asked
+local real_confirm, real_notify = vim.fn.confirm, vim.notify
+vim.notify = function() end
+vim.fn.confirm = function(msg)
+  asked = msg
+  return 2
+end
+eq(picker.forget_file(main .. "/docs/guide.md"), false, "forget file: Cancel removes nothing")
+eq(asked, table.concat({
+  "Forget the links of 2 conversations to docs/guide.md?",
+  "1 conversation has other places too, and keeps them.",
+  "1 conversation has no other place, so it is gone from every list.",
+  "The agents' own history is not touched.",
+}, "\n"), "forget file: the confirm says what stays and what goes")
+eq(#links.for_file(main, "docs/guide.md"), 4, "forget file: still four records after Cancel")
+vim.fn.confirm = function()
+  return 1
+end
+eq(picker.forget_file(main .. "/docs/guide.md"), true, "forget file: Forget removes")
+vim.fn.confirm, vim.notify = real_confirm, real_notify
+eq(vim.tbl_map(function(rec) return rec.session end, links.for_file(main, "docs/guide.md")), { "s-docs-dir" }, "forget file: only the folder place above is left")
+eq(vim.tbl_map(function(p) return p.file end, conv.of(main, "s-two-files").places), { "docs/other.md" }, "forget file: the conversation keeps its other file")
+eq(conv.of(main, "s-guide-only"), nil, "forget file: the conversation with no place left is gone")
+eq(links.forget_file(main, "docs/guide.md"), 0, "forget file: nothing left to forget")
 
 -- A transcript can disappear without the append-only store changing. The
 -- short count cache therefore expires and notices the lifecycle change.

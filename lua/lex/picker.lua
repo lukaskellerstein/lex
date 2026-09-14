@@ -11,18 +11,18 @@
 -- agents have talked about in this project.
 --
 -- The preview is the conversation: every place it has, in the order they
--- were added, the questions asked, and the last thing the agent said, read
--- from the transcript on demand (Claude Code and Codex keep JSONL, OpenCode
--- answers `opencode export <id>`).
+-- were added, and the questions asked.
 --
 --   <CR>  go to the agent, or resume it (lex.open)
 --   g     go to the lines in the file
 --   d     forget this conversation, after a confirm
+--   /     search
 --   q     close
 --   ?     every key, snacks' own too
 --
--- The footer of the list says `<CR>`, `g`, `d` and `?`, so nobody has to
--- know them.
+-- The picker opens on the rows, not in the search, so the letters are keys
+-- at once. The footer of the list says `Enter`, `g`, `d`, `/` and `?`, so
+-- nobody has to know them.
 --
 -- The right-click menu inside this picker offers the same, through
 -- `menu_action`; mac-setup's ai-ref.lua draws it.
@@ -277,122 +277,6 @@ local function formatter(scope)
   end
 end
 
--- ── the transcript's last answer ───────────────────────────────────────────
-
---- The text parts of a transcript message, for the two JSONL shapes.
-local function text_of(obj)
-  local role, content
-  if obj.type == "assistant" or obj.type == "user" then
-    role = obj.type
-    content = obj.message and obj.message.content
-  elseif obj.type == "response_item" and type(obj.payload) == "table" and obj.payload.type == "message" then
-    role = obj.payload.role
-    content = obj.payload.content
-  end
-  if not role then
-    return nil
-  end
-  if type(content) == "string" then
-    return role, content
-  end
-  local parts = {}
-  for _, part in ipairs(type(content) == "table" and content or {}) do
-    if type(part) == "table" and type(part.text) == "string" and (part.type == "text" or part.type == "output_text" or part.type == "input_text") then
-      parts[#parts + 1] = part.text
-    end
-  end
-  return role, table.concat(parts, "\n")
-end
-
---- The last assistant text in `opencode export` output.
-local function opencode_answer(stdout)
-  local ok, obj = pcall(vim.json.decode, stdout or "")
-  if not ok or type(obj) ~= "table" then
-    return nil
-  end
-  local last
-  for _, m in ipairs(obj.messages or {}) do
-    local info = m.info or m
-    if info.role == "assistant" then
-      local parts = {}
-      for _, part in ipairs(m.parts or {}) do
-        if part.type == "text" and type(part.text) == "string" then
-          parts[#parts + 1] = part.text
-        end
-      end
-      if #parts > 0 then
-        last = table.concat(parts, "\n")
-      end
-    end
-  end
-  return last
-end
-
---- The last assistant message in a JSONL transcript. Only the last 2 MB are
---- read: a long session's file grows without limit, and the newest turn is
---- always at the end.
-local function file_answer(path)
-  local f = io.open(path, "r")
-  if not f then
-    return nil
-  end
-  local size = f:seek("end")
-  local from = math.max(0, size - 2 * 1024 * 1024)
-  f:seek("set", from)
-  if from > 0 then
-    f:read("*l")
-  end
-  local last
-  for line in f:lines() do
-    if line:find('"assistant"', 1, true) then
-      local ok, obj = pcall(vim.json.decode, line)
-      if ok and type(obj) == "table" then
-        local role, text = text_of(obj)
-        if role == "assistant" and text and text ~= "" then
-          last = text
-        end
-      end
-    end
-  end
-  f:close()
-  return last
-end
-
---- The last thing the agent said.
----
---- Claude Code and Codex keep a file, and reading its tail costs a
---- millisecond, so those answer at once. OpenCode keeps its sessions in a
---- database and only `opencode export` can read them, which costs 400 ms
---- every time (measured 2026-09-12) -- far too much for a preview that is
---- redrawn on every cursor move. So a `cb` makes the OpenCode call
---- asynchronous, and the preview redraws itself when the answer lands.
----@param rec lex.Record
----@param cb? fun(answer: string|nil)  required to avoid blocking on OpenCode
----@return string|nil answer, boolean pending
-function M.last_answer(rec, cb)
-  if rec.agent == "opencode" then
-    if cb then
-      vim.system({ "opencode", "export", rec.session }, { text = true }, function(out)
-        vim.schedule(function()
-          cb(out.code == 0 and opencode_answer(out.stdout) or nil)
-        end)
-      end)
-      return nil, true
-    end
-    local out = vim.system({ "opencode", "export", rec.session }, { text = true }):wait(4000)
-    return (out and out.code == 0) and opencode_answer(out.stdout) or nil, false
-  end
-  local path = rec.transcript
-  if not path or path == "" or not vim.uv.fs_stat(path) then
-    path = require("lex.locate").session_file(rec)
-  end
-  local answer = (path and vim.uv.fs_stat(path)) and file_answer(path) or nil
-  if cb then
-    cb(answer)
-  end
-  return answer, false
-end
-
 -- ── the preview ────────────────────────────────────────────────────────────
 
 -- Which preview line is which place, per preview buffer, so a click on a
@@ -400,11 +284,11 @@ end
 local targets = {}
 
 --- The preview: the conversation as it happened. One block per turn, the
---- prompt and the places that came with it, separated by a rule, then the
---- agent's last answer. The lines themselves are not shown: they are in the
---- file, one click away, and they crowded out everything else (Lukas,
---- 2026-09-12). A place line opens the file at its lines: `<CR>`, or a
---- double click.
+--- prompt and the places that came with it, separated by a rule. The lines
+--- themselves are not shown: they are in the file, one click away, and they
+--- crowded out everything else (Lukas, 2026-09-12). Nor is the agent's last
+--- answer: the conversation itself is one `Enter` away (Lukas, 2026-09-14).
+--- A place line opens the file at its lines: `<CR>`, or a double click.
 local function previewer(scope)
   return function(ctx)
     local item = ctx.item
@@ -461,46 +345,6 @@ local function previewer(scope)
         lines[#lines + 1] = ("%s %s"):format(marker, place_text(r, nil, true))
         marks_by_line[#lines] = r
       end
-    end
-
-    -- Never block the list. `answer_read` is set before the call, so moving
-    -- the cursor over a row starts at most one read of it; when the answer
-    -- lands the preview draws itself again, if that row is still the one.
-    if not item.answer_read then
-      item.answer_read = true
-      local answer, pending = M.last_answer(rec, function(text)
-        item.answer = text
-        item.pending = false
-        local ok, current = pcall(function()
-          return ctx.picker:current()
-        end)
-        if ok and current == item then
-          pcall(function()
-            ctx.picker:show_preview()
-          end)
-        end
-      end)
-      item.answer = answer
-      item.pending = pending
-    end
-    if item.pending and not item.answer then
-      band("**the last answer**")
-      add("_reading it from the agent…_")
-    elseif item.answer then
-      band("**the last answer**, in the agent's own words")
-      local answer = vim.split(item.answer, "\n", { plain = true })
-      for i = 1, math.min(#answer, 120) do
-        lines[#lines + 1] = answer[i]
-      end
-      if #answer > 120 then
-        lines[#lines + 1] = "…"
-      end
-      add("")
-      add(rule)
-    elseif item.gone then
-      band("_the transcript is gone_")
-    else
-      band("_no answer read from the transcript_")
     end
 
     ctx.preview:reset()
@@ -600,35 +444,74 @@ function M.forget(item, scope, only_place)
   return removed > 0
 end
 
+--- Forget every link one file has, after a confirm: the explorer's right
+--- click on a file row. The confirm says which conversations keep other
+--- places and which have none left, because the second kind is gone from
+--- every list afterwards (links.forget_file).
+---@param path string absolute
+---@return boolean removed
+function M.forget_file(path)
+  local scope = M.scope_for(path, false)
+  local convs = conv.group(links.repo(scope.repo).by_file[scope.rel] or {})
+  if #convs == 0 then
+    vim.notify("Lex: no conversations in " .. scope.rel, vim.log.levels.INFO)
+    return false
+  end
+  local keep = 0
+  for _, c in ipairs(convs) do
+    if #conv.of(scope.repo, c.session).places > #c.places then
+      keep = keep + 1
+    end
+  end
+  local gone = #convs - keep
+  local lines = { ("Forget the links of %d conversation%s to %s?"):format(#convs, #convs == 1 and "" or "s", scope.rel) }
+  if keep > 0 then
+    lines[#lines + 1] = keep == 1 and "1 conversation has other places too, and keeps them."
+      or ("%d conversations have other places too, and keep them."):format(keep)
+  end
+  if gone > 0 then
+    lines[#lines + 1] = gone == 1 and "1 conversation has no other place, so it is gone from every list."
+      or ("%d conversations have no other place, so they are gone from every list."):format(gone)
+  end
+  lines[#lines + 1] = "The agents' own history is not touched."
+  if vim.fn.confirm(table.concat(lines, "\n"), "&Forget\n&Cancel", 2) ~= 1 then
+    return false
+  end
+  local removed, err = links.forget_file(scope.repo, scope.rel)
+  if err then
+    vim.notify("Lex: " .. err, vim.log.levels.ERROR)
+    return false
+  end
+  vim.notify(("Lex: forgot %d link%s in %s"):format(removed, removed == 1 and "" or "s", scope.rel), vim.log.levels.INFO)
+  return removed > 0
+end
+
 -- ── the keys, at the foot of the list ──────────────────────────────────────
 
---- The keys only Lex gives this picker, most wanted first, and `?` for the
---- rest of snacks' own (Lukas, 2026-09-14). The picker starts typing into
---- the search, so the letters are letters there until `Esc`; the footer
---- says so instead of leaving a `d` that searches for "d".
+--- The keys only Lex gives this picker, most wanted first, then `/` back to
+--- the search the picker no longer starts in, and `?` for the rest of
+--- snacks' own (Lukas, 2026-09-14). `Enter`, not vim's `<CR>`: the footer
+--- is read by whoever does not know the keys yet ("What is <CR>?").
 local KEYS = {
-  { "<CR>", "open agent" },
-  { "g", "go to lines", esc = true },
-  { "d", "forget", esc = true },
-  { "?", "all keys", esc = true },
+  { "Enter", "open agent" },
+  { "g", "go to lines" },
+  { "d", "forget" },
+  { "/", "search" },
+  { "?", "all keys" },
 }
 
 --- The footer for a window `width` cells wide: as many keys as fit, the
 --- last ones dropped first. Too long is not an option: nvim keeps the END
---- of a footer that does not fit, which cut `<CR>` away first (130 columns,
+--- of a footer that does not fit, which cut `Enter` away first (130 columns,
 --- 2026-09-14). Nil when not even the first fits, or with no width the
 --- whole of it.
 ---@param width? integer
 ---@return string[][]|nil
 function M.footer(width)
   for n = #KEYS, 1, -1 do
-    local out, esc = {}, false
+    local out = {}
     for i = 1, n do
       local k = KEYS[i]
-      if k.esc and not esc then
-        esc = true
-        out[#out + 1] = { "  Esc, then", "SnacksFooter" }
-      end
       out[#out + 1] = { " ", "SnacksFooter" }
       out[#out + 1] = { " " .. k[1] .. " ", "SnacksFooterKey" }
       out[#out + 1] = { " " .. k[2] .. " ", "SnacksFooterDesc" }
@@ -743,6 +626,10 @@ function M.pick(scope)
   Snacks.picker.pick({
     source = "lex",
     title = scope.title,
+    -- On the rows, not in the search: the list is there to be moved through
+    -- and acted on, and `g` or `d` typed into the search only searched
+    -- (Lukas, 2026-09-14). `/` goes to the search.
+    focus = "list",
     -- The layout the user chose, resolved the way snacks resolves it, with
     -- the keys added. A function, so a resize that picks another preset
     -- gets them again. Its `config` hook has run once here and must not run

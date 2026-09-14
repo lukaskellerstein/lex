@@ -213,15 +213,28 @@ end
 ---@param target { session: string, key?: string }
 ---@return integer removed, string|nil err
 function M.forget(repo, target)
+  return M.forget_all(repo, { target })
+end
+
+--- `forget` for many targets: one read, and a tombstone for each target
+--- that removes something. Each tombstone is its own write, so a writer
+--- appending at the same moment lands between two lines, never inside one.
+---@param repo string
+---@param targets { session: string, key?: string }[]
+---@return integer removed, string|nil err
+function M.forget_all(repo, targets)
   M.migrate(repo)
   local file = M.file(repo)
   if not vim.uv.fs_stat(file) then
     return 0
   end
-  local removed = 0
+  local removed, used = 0, {}
   for _, rec in ipairs(read_file(file, repo)) do
-    if matches(rec, target) then
-      removed = removed + 1
+    for i, target in ipairs(targets) do
+      if matches(rec, target) then
+        removed, used[i] = removed + 1, true
+        break
+      end
     end
   end
   if removed == 0 then
@@ -231,7 +244,13 @@ function M.forget(repo, target)
   if not out then
     return 0, "cannot append a forget marker to " .. file
   end
-  out:write(vim.json.encode({ _lex = "forget", at = os.time(), session = target.session, key = target.key }), "\n")
+  local at = os.time()
+  for i, target in ipairs(targets) do
+    if used[i] then
+      out:write(vim.json.encode({ _lex = "forget", at = at, session = target.session, key = target.key }) .. "\n")
+      out:flush()
+    end
+  end
   out:close()
   return removed
 end

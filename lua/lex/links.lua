@@ -460,10 +460,10 @@ end
 
 --- Drop records, reload the repository from scratch, and tell the editor.
 ---@param repo string
----@param drop fun(rec: lex.Record): boolean
+---@param targets { session: string, key?: string }[]
 ---@return integer removed, string|nil err
-local function forget(repo, target)
-  local removed, err = store.forget(repo, target)
+local function forget(repo, targets)
+  local removed, err = store.forget_all(repo, targets)
   if removed > 0 then
     local r = M.repo(repo)
     reset(r)
@@ -478,7 +478,7 @@ end
 ---@param session string
 ---@return integer removed, string|nil err
 function M.forget_session(repo, session)
-  return forget(repo, { session = session })
+  return forget(repo, { { session = session } })
 end
 
 --- Forget one place of a conversation: every record with the same session
@@ -488,7 +488,31 @@ end
 ---@param key string   from lex.conv.key
 ---@return integer removed, string|nil err
 function M.forget_place(repo, session, key)
-  return forget(repo, { session = session, key = key })
+  return forget(repo, { { session = session, key = key } })
+end
+
+--- Forget every place in one file. Each conversation loses its places here
+--- and keeps the ones elsewhere; a conversation is only the places it has,
+--- so one with nothing left is gone from every list by itself, with no
+--- second step (Lukas, 2026-09-14). Folder places above the file belong to
+--- the folder and stay.
+---@param repo string
+---@param file string relative
+---@return integer removed, string|nil err
+function M.forget_file(repo, file)
+  local targets, seen = {}, {}
+  for _, rec in ipairs(M.repo(repo).by_file[file] or {}) do
+    local key = record_key(rec)
+    local id = tostring(rec.session) .. " " .. key
+    if rec.session and not seen[id] then
+      seen[id] = true
+      targets[#targets + 1] = { session = rec.session, key = key }
+    end
+  end
+  if #targets == 0 then
+    return 0
+  end
+  return forget(repo, targets)
 end
 
 --- Forget the cached roots; tests call it between repositories.

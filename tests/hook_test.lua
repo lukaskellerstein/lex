@@ -176,6 +176,13 @@ race:write(vim.json.encode({ repo = race_repo, path = race_repo .. "/y.lua", fil
 race:close()
 eq(vim.tbl_map(function(r) return r.file end, store.read(race_repo)), { "y.lua" }, "forget marker: a later append with the same session survives")
 eq(#vim.fn.readfile(store.file(race_repo)), 3, "forget marker: history is appended, never rewritten")
+-- many targets at once: a tombstone for each one that removes something
+race = assert(io.open(store.file(race_repo), "a"))
+race:write(vim.json.encode({ repo = race_repo, path = race_repo .. "/z.lua", file = "z.lua", session = "other", index = 1, of = 1 }), "\n")
+race:close()
+eq(store.forget_all(race_repo, { { session = "same", key = "file:y.lua" }, { session = "other" }, { session = "nobody" } }), 2, "forget_all: removes what any target matches")
+eq(store.read(race_repo), {}, "forget_all: nothing is left")
+eq(#vim.fn.readfile(store.file(race_repo)), 6, "forget_all: two tombstones, none for the target that matched nothing")
 vim.env.LEX_HOME = nil
 
 -- outside tmux: no pane
