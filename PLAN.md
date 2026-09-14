@@ -228,6 +228,17 @@ month after its last activity.
     `d` in the picker, or its right-click menu, removes a conversation, or
     one of its places, after a confirm. Decided with Lukas 2026-09-12.
 
+    A file can forget all its links at once (`picker.forget_file`, the
+    explorer's right click on a file row). Each conversation loses only its
+    places in that file and keeps the rest; the folder places above the
+    file are the folder's and stay. There is no separate "remove the
+    conversation" step, because a conversation is nothing but its places:
+    the last one forgotten, it is gone from every list. Lukas, 2026-09-14:
+    "Only when last link between the files and the conversations is
+    removed, then the conversation does not have any selections and can be
+    removed." One `store.forget_all` call, one tombstone per place, each its
+    own write.
+
 22. **The item is `📌 Pin Lex Place`, not `📌 Copy Lex Place`.** Lukas,
     2026-09-14: the item pins a place more than it copies one. And the popup
     already carries nvim's own `Copy` a few rows lower, so the menu showed
@@ -638,19 +649,20 @@ readable.
    `running`. A picker driven from a real terminal under tmux is how that
    was found; headless nvim has no window for a picker to draw in.
 
-   **Nothing in the preview may block the list.** Claude Code and Codex
-   keep a transcript file and the last 2 MB of it read in a millisecond, so
-   those answer at once. OpenCode keeps its sessions in a database, only
-   `opencode export` can read them, and that costs 400 ms every time
-   (measured 2026-09-12) -- which froze the arrow keys on every OpenCode
-   row, because a preview is redrawn on every cursor move. So the OpenCode
-   read is asynchronous: the preview says it is reading, and draws itself
-   again when the answer lands, if that row is still the one.
+   **No last answer in the preview** (removed 2026-09-14, Lukas: "remove
+   the last answer section entirely"). It was read from the transcript:
+   the last 2 MB of a Claude Code or Codex file in a millisecond, and
+   `opencode export` for OpenCode, 400 ms every time (measured 2026-09-12),
+   so that read ran asynchronously to keep the arrow keys from freezing on
+   every OpenCode row. The answer, often a long one, pushed the turns and
+   their places out of view, and the conversation itself is one `Enter`
+   away. With it went every transcript read in the picker; `gone` still
+   checks that the transcript file exists.
 
    **The preview** is the conversation as it happened: a header, then one
    block per turn, each headed by a band, `turn N · age`, then the prompt,
    then the places that came with that prompt, an arrow on the ones in the
-   current scope; then the agent's last answer under its own band. A band
+   current scope. A band
    is a drawn line above and below the title, not a markdown rule: a rule
    under a line of text is a setext heading, and a single rule between two
    blocks reads as belonging to neither, which is what confused Lukas
@@ -666,6 +678,17 @@ readable.
    gone last. The right-click inside the picker is the picker's own menu,
    not the buffer's: go to the agent, go to the lines, forget this
    conversation, forget only this place.
+
+   **The keys are on screen** (Lukas, 2026-09-14): the list's bottom border
+   reads `Enter open agent  g go to lines  d forget  / search  ? all keys`,
+   `Enter` rather than vim's `<CR>`, which Lukas did not recognise. The
+   picker opens on the rows (`focus = "list"`), not in the search: typed
+   into the search, `g` and `d` only searched, and the first footer had to
+   say "Esc, then" in front of them. As many keys as fit, the last dropped first, refitted on
+   every resize: nvim keeps the END of a footer too long for its window,
+   which cut the first key away first at 130 columns. The footer goes on the frame
+   that carries the title, else on the list; `ivy` has neither bottom edge
+   and shows none.
 5. **Open.** Alive → jump to its pane (the `opener` adapter, then tmux).
    Not alive → the user picks a tmux session or a split here, and a new
    window there runs the agent's resume command: `claude --resume <id>`,
@@ -853,7 +876,9 @@ conversation came from.
    `lukas-inbox jump` opener. Checked headless on the real store: the
    record from Lukas's first prompt resolves and paints in `main.py`. Not
    yet seen on a screen: the explorer row, the statusline chip, the picker,
-   the resume. No keymap yet; the right-click and `:LexLinks` are the ways
+   the resume. Keys since 2026-09-14, in mac-setup's `plugins/lex.lua`:
+   SPACE 2 a (`:LexLinks repo`) and SPACE 2 f (`:LexLinks file`); besides
+   them the right-click and `:LexLinks` are the ways
    in.
 6. **Docs**, and the move of the menu item out of `ai-ref.lua` into
    `lex.nvim`, so a user without this config gets the same right-click. The

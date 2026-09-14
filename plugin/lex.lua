@@ -49,7 +49,7 @@ vim.api.nvim_create_user_command("LexLinks", function(o)
     return vim.notify("Lex: not a file; try :LexLinks repo", vim.log.levels.INFO)
   end
   if o.args == "file" then
-    return picker.pick({ kind = "file", repo = st.repo, rel = st.file, buf = buf, title = "Lex · " .. st.file })
+    return picker.pick({ kind = "file", repo = st.repo, rel = st.file, buf = buf, title = picker.title("file", st.file) })
   end
   picker.pick(picker.scope_at(buf, vim.api.nvim_win_get_cursor(0)[1]))
 end, {

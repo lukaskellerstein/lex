@@ -193,18 +193,27 @@ again by their text, never by their old line number.
 
 One row is one conversation: the session, the agent, the age, what it holds
 here, and where its agent is open right now. The preview is the conversation as
-it happened, turn by turn, with the places each prompt carried and the agent's
-last answer.
+it happened, turn by turn, with the places each prompt carried.
 
 | Key | What |
 |:--|:--|
 | `<CR>`, double click | go to the agent |
 | `g` | go to the lines |
 | `d` | forget this conversation, after a confirm |
+| `/` | search |
 | `q` | close |
+| `?` | every key, snacks' own too |
+
+The bottom border of the list shows these keys, as many as fit. The list opens
+on the rows, not in the search, so every key works at once.
 
 `d` removes Lex's memory of a conversation. It never touches the agent's own
 history.
+
+To forget every link of one file, for example from a right-click on an explorer
+row, call `require("lex.picker").forget_file(path)`. Each conversation loses
+only its places in that file. A conversation with no place left disappears from
+every list, because Lex keeps no conversation apart from its places.
 
 ---
 
