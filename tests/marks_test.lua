@@ -260,10 +260,11 @@ end
 local full = picker.footer()
 eq(full[2][1], "[Enter]", "picker: the footer starts with [Enter]")
 eq(vim.tbl_map(function(chunk) return chunk[1] end, { full[11], full[14] }), { "[Tab]", "[/]" }, "picker: [Tab] select, then [/] search")
-eq(cells(full), 89, "picker: all six keys in 89 cells")
+eq(cells(full), 75, "picker: all five keys in 75 cells")
+eq(full[#full - 1][1], " search", "picker: [/] search is the last key, no [?]")
 eq(cells(picker.footer(cells(full))), cells(full), "picker: the whole footer when it fits")
 local cut = picker.footer(cells(full) - 1)
-eq(cut[#cut - 1][1], " search", "picker: the last key dropped first")
+eq(cut[#cut - 1][1], " select", "picker: the last key dropped first")
 eq(picker.footer(5), nil, "picker: no footer when not even Enter fits")
 local default = { layout = { box = "horizontal", { box = "vertical", border = true, title = "{title} {live} {flags}", { win = "input", border = "bottom" }, { win = "list", border = "none" } }, { win = "preview", border = true } } }
 picker.with_keys(default)
@@ -515,8 +516,22 @@ vim.fn.confirm = function(msg)
 end
 eq(picker.forget(pair_items, pair_scope), true, "forget selected: both forgotten")
 vim.fn.confirm, vim.notify = real_confirm, real_notify
-eq(asked, "Forget these 2 whole conversations, 2 places?\ncodex · s-pair-b, claude · s-pair-a\nThe agent's own history is not touched.", "forget selected: one confirm names them all")
+eq(asked, "Forget these 2 whole conversations, 2 places?\ncodex · s-pair-b\nclaude · s-pair-a\nThe agent's own history is not touched.", "forget selected: one confirm names them all, one per line")
 eq({ conv.of(main, "s-pair-a"), conv.of(main, "s-pair-b") }, {}, "forget selected: neither is left")
+-- a long selection: nine lines named, the rest counted
+local many_items = {}
+for i = 1, 12 do
+  many_items[i] = { conv = { session = ("s-many-%02d"):format(i), agent = "claude", places = { { file = "a.lua" } } }, here = {} }
+end
+asked = nil
+vim.fn.confirm = function(msg)
+  asked = msg
+  return 2
+end
+eq(picker.forget(many_items, pair_scope), false, "forget selected: Cancel on a long selection")
+vim.fn.confirm = real_confirm
+local asked_lines = vim.split(asked, "\n")
+eq({ #asked_lines, asked_lines[10], asked_lines[11] }, { 12, "claude · s-many-0", "and 3 more" }, "forget selected: at most ten lines of names")
 
 -- A transcript can disappear without the append-only store changing. The
 -- short count cache therefore expires and notices the lifecycle change.

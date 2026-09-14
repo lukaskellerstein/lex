@@ -23,8 +23,8 @@
 --   ?     every key, snacks' own too
 --
 -- The picker opens on the rows, not in the search, so the letters are keys
--- at once. The footer of the list says `[Enter]`, `[g]`, `[d]`, `[Tab]`,
--- `[/]` and `[?]`, so nobody has to know them.
+-- at once. The footer of the list says `[Enter]`, `[g]`, `[d]`, `[Tab]` and
+-- `[/]`, so nobody has to know them.
 --
 -- The right-click menu inside this picker offers the same, through
 -- `menu_action`; mac-setup's ai-ref.lua draws it.
@@ -445,7 +445,12 @@ function M.forget(items, scope, only_place)
   else
     what = ("these %d whole conversations, %s"):format(#items, plural(places, "place"))
   end
-  local answer = vim.fn.confirm(("Forget %s?\n%s\nThe agent's own history is not touched."):format(what, table.concat(who, ", ")), "&Forget\n&Cancel", 2)
+  -- One conversation per line (Lukas, 2026-09-14), at most ten, so a
+  -- select-all over a big project still fits on the screen.
+  if #who > 10 then
+    who = vim.list_extend(vim.list_slice(who, 1, 9), { ("and %d more"):format(#who - 9) })
+  end
+  local answer = vim.fn.confirm(("Forget %s?\n%s\nThe agent's own history is not touched."):format(what, table.concat(who, "\n")), "&Forget\n&Cancel", 2)
   if answer ~= 1 then
     return false
   end
@@ -503,18 +508,17 @@ end
 -- ── the keys, at the foot of the list ──────────────────────────────────────
 
 --- The keys only Lex gives this picker, most wanted first, then snacks'
---- `Tab`, which `d` honours, `/` back to the search the picker no longer
---- starts in, and `?` for the rest (Lukas, 2026-09-14). `Enter`, not vim's
---- `<CR>`: the footer is read by whoever does not know the keys yet ("What
---- is <CR>?"), and every key in brackets, so `g` reads as a key and not as a
---- word.
+--- `Tab`, which `d` honours, and `/` back to the search the picker no longer
+--- starts in (Lukas, 2026-09-14). Not `?`: it still lists every key, but it
+--- is snacks' long list, not this picker's. `Enter`, not vim's `<CR>`: the
+--- footer is read by whoever does not know the keys yet ("What is <CR>?"),
+--- and every key in brackets, so `g` reads as a key and not as a word.
 local KEYS = {
   { "Enter", "open agent" },
   { "g", "go to lines" },
   { "d", "forget" },
   { "Tab", "select" },
   { "/", "search" },
-  { "?", "all keys" },
 }
 
 --- The footer for a window `width` cells wide: as many keys as fit, the

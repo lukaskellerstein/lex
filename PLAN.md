@@ -684,13 +684,16 @@ readable.
    place without what went (`picker.opts.items`, then `refresh`), closing
    it only when nothing is left. It used to close first and reopen after.
    `d` forgets every row `Tab` selected, with one confirm that names them
-   all and one store call; the right-click item stays the clicked row.
+   all, one per line and at most ten (Lukas asked for lines after eight
+   ran together on one), and one store call; the right-click item stays
+   the clicked row.
 
    **The keys are on screen** (Lukas, 2026-09-14): the list's bottom border
    reads `[Enter] open agent  [g] go to lines  [d] forget  [Tab] select
-   [/] search  [?] all keys`, in 89 cells: brackets so a key reads as a
-   key, and no padding inside them, which took six keys to 102 cells in a
-   list about 98 wide. `Enter` rather than vim's `<CR>`, which Lukas did
+   [/] search`, in 75 cells: brackets so a key reads as a key, and no
+   padding inside them, which took six keys to 102 cells in a list about
+   98 wide. `[?] all keys` was dropped (Lukas, 2026-09-14): `?` still works,
+   but it opens snacks' long list, not this picker's. `Enter` rather than vim's `<CR>`, which Lukas did
    not recognise. `Tab` is listed only because `d` now acts on the
    selection. The
    picker opens on the rows (`focus = "list"`), not in the search: typed
