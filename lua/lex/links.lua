@@ -491,6 +491,15 @@ function M.forget_place(repo, session, key)
   return forget(repo, { { session = session, key = key } })
 end
 
+--- Forget many conversations or places in one store call: a whole
+--- conversation is `{ session }`, one place `{ session, key }`.
+---@param repo string
+---@param targets { session: string, key?: string }[]
+---@return integer removed, string|nil err
+function M.forget_all(repo, targets)
+  return forget(repo, targets)
+end
+
 --- Forget every place in one file. Each conversation loses its places here
 --- and keeps the ones elsewhere; a conversation is only the places it has,
 --- so one with nothing left is gone from every list by itself, with no

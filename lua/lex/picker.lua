@@ -15,14 +15,16 @@
 --
 --   <CR>  go to the agent, or resume it (lex.open)
 --   g     go to the lines in the file
---   d     forget this conversation, after a confirm
+--   d     forget this conversation, or every row `Tab` selected, after a
+--         confirm drawn over the open list
+--   Tab   select a row
 --   /     search
 --   q     close
 --   ?     every key, snacks' own too
 --
 -- The picker opens on the rows, not in the search, so the letters are keys
--- at once. The footer of the list says `Enter`, `g`, `d`, `/` and `?`, so
--- nobody has to know them.
+-- at once. The footer of the list says `[Enter]`, `[g]`, `[d]`, `[Tab]`,
+-- `[/]` and `[?]`, so nobody has to know them.
 --
 -- The right-click menu inside this picker offers the same, through
 -- `menu_action`; mac-setup's ai-ref.lua draws it.
@@ -415,27 +417,39 @@ function M.go_to(rec, scope)
   vim.cmd("normal! zz")
 end
 
---- Forget a conversation, or one of its places. Destructive and not
---- undoable, so it asks first and says what it removed.
----@param item lex.Item
+--- Forget whole conversations, the rows `Tab` selected or the one under the
+--- cursor, or one place of a single conversation. Destructive and not
+--- undoable, so it asks first, once for all of them, and says what it
+--- removed.
+---@param items lex.Item[]
 ---@param scope lex.Scope
----@param only_place? boolean
+---@param only_place? boolean  the place of the one item, not the conversation
 ---@return boolean removed
-function M.forget(item, scope, only_place)
-  local c = item.conv
-  local place = only_place and item.here[1]
-  local what = place and ("the place %s of this conversation"):format(place_text(place, item.res, true))
-    or ("this whole conversation, %d place%s in %d file%s"):format(#c.places, #c.places == 1 and "" or "s", conv.files(c), conv.files(c) == 1 and "" or "s")
-  local answer = vim.fn.confirm(("Forget %s?\n%s · %s\nThe agent's own history is not touched."):format(what, c.agent or "?", tostring(c.session):sub(1, 8)), "&Forget\n&Cancel", 2)
+function M.forget(items, scope, only_place)
+  local place = only_place and #items == 1 and items[1].here[1]
+  local what, targets, who = nil, {}, {}
+  local places, files = 0, 0
+  for _, item in ipairs(items) do
+    local c = item.conv
+    targets[#targets + 1] = { session = c.session, key = place and conv.key(place) or nil }
+    who[#who + 1] = ("%s · %s"):format(c.agent or "?", short(c.session))
+    places, files = places + #c.places, files + conv.files(c)
+  end
+  local function plural(n, word)
+    return ("%d %s%s"):format(n, word, n == 1 and "" or "s")
+  end
+  if place then
+    what = ("the place %s of this conversation"):format(place_text(place, items[1].res, true))
+  elseif #items == 1 then
+    what = ("this whole conversation, %s in %s"):format(plural(places, "place"), plural(files, "file"))
+  else
+    what = ("these %d whole conversations, %s"):format(#items, plural(places, "place"))
+  end
+  local answer = vim.fn.confirm(("Forget %s?\n%s\nThe agent's own history is not touched."):format(what, table.concat(who, ", ")), "&Forget\n&Cancel", 2)
   if answer ~= 1 then
     return false
   end
-  local removed, err
-  if place then
-    removed, err = links.forget_place(scope.repo, c.session, conv.key(place))
-  else
-    removed, err = links.forget_session(scope.repo, c.session)
-  end
+  local removed, err = links.forget_all(scope.repo, targets)
   if err then
     vim.notify("Lex: " .. err, vim.log.levels.ERROR)
     return false
@@ -488,14 +502,17 @@ end
 
 -- ── the keys, at the foot of the list ──────────────────────────────────────
 
---- The keys only Lex gives this picker, most wanted first, then `/` back to
---- the search the picker no longer starts in, and `?` for the rest of
---- snacks' own (Lukas, 2026-09-14). `Enter`, not vim's `<CR>`: the footer
---- is read by whoever does not know the keys yet ("What is <CR>?").
+--- The keys only Lex gives this picker, most wanted first, then snacks'
+--- `Tab`, which `d` honours, `/` back to the search the picker no longer
+--- starts in, and `?` for the rest (Lukas, 2026-09-14). `Enter`, not vim's
+--- `<CR>`: the footer is read by whoever does not know the keys yet ("What
+--- is <CR>?"), and every key in brackets, so `g` reads as a key and not as a
+--- word.
 local KEYS = {
   { "Enter", "open agent" },
   { "g", "go to lines" },
   { "d", "forget" },
+  { "Tab", "select" },
   { "/", "search" },
   { "?", "all keys" },
 }
@@ -510,11 +527,14 @@ local KEYS = {
 function M.footer(width)
   for n = #KEYS, 1, -1 do
     local out = {}
+    -- `[g] go to lines`, two spaces between keys: the brackets set a key
+    -- apart, so the padding snacks' own footer uses would only cost width
+    -- (six keys padded needed 102 cells, the list is about 98 wide).
     for i = 1, n do
       local k = KEYS[i]
-      out[#out + 1] = { " ", "SnacksFooter" }
-      out[#out + 1] = { " " .. k[1] .. " ", "SnacksFooterKey" }
-      out[#out + 1] = { " " .. k[2] .. " ", "SnacksFooterDesc" }
+      out[#out + 1] = { i == 1 and " " or "  ", "SnacksFooter" }
+      out[#out + 1] = { "[" .. k[1] .. "]", "SnacksFooterKey" }
+      out[#out + 1] = { " " .. k[2], "SnacksFooterDesc" }
     end
     out[#out + 1] = { " ", "SnacksFooter" }
     local cells = 0
@@ -606,14 +626,11 @@ end
 
 local last_scope
 
---- Open the picker for a scope.
+--- The rows of a scope, with the text the search matches.
 ---@param scope lex.Scope
-function M.pick(scope)
+---@return lex.Item[]
+local function rows(scope)
   local items = M.items(scope)
-  if #items == 0 then
-    return vim.notify("Lex: no conversations here", vim.log.levels.INFO)
-  end
-  last_scope = scope
   for _, item in ipairs(items) do
     item.text = table.concat({
       prompt_of(item),
@@ -623,6 +640,36 @@ function M.pick(scope)
       item.here[1] and (item.here[1].file or item.here[1].dir) or "",
     }, " ")
   end
+  return items
+end
+
+--- Forget from inside the open picker. The confirm draws over the list,
+--- which stays open (Lukas, 2026-09-14), and the list then redraws without
+--- what was forgotten, or closes when nothing is left.
+---@param picker table  a snacks picker
+---@param scope lex.Scope
+---@param items lex.Item[]
+---@param only_place? boolean
+local function forget_in(picker, scope, items, only_place)
+  if #items == 0 or not M.forget(items, scope, only_place) then
+    return
+  end
+  local left = rows(scope)
+  if #left == 0 then
+    return picker:close()
+  end
+  picker.opts.items = left
+  picker:refresh()
+end
+
+--- Open the picker for a scope.
+---@param scope lex.Scope
+function M.pick(scope)
+  local items = rows(scope)
+  if #items == 0 then
+    return vim.notify("Lex: no conversations here", vim.log.levels.INFO)
+  end
+  last_scope = scope
   Snacks.picker.pick({
     source = "lex",
     title = scope.title,
@@ -657,16 +704,8 @@ function M.pick(scope)
           M.go_to(item.here[1] or item.conv.newest, scope)
         end
       end,
-      lex_forget = function(picker, item)
-        if not item then
-          return
-        end
-        picker:close()
-        if M.forget(item, scope) then
-          vim.schedule(function()
-            M.pick(scope)
-          end)
-        end
+      lex_forget = function(picker)
+        forget_in(picker, scope, picker:selected({ fallback = true }))
       end,
     },
     win = {
@@ -807,12 +846,7 @@ function M.menu_action(action)
     picker:close()
     return M.go_to(item.here[1] or item.conv.newest, scope)
   end
-  picker:close()
-  if M.forget(item, scope, action == "forget_place") then
-    vim.schedule(function()
-      M.pick(scope)
-    end)
-  end
+  forget_in(picker, scope, { item }, action == "forget_place")
 end
 
 return M

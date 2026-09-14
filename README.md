@@ -199,7 +199,8 @@ it happened, turn by turn, with the places each prompt carried.
 |:--|:--|
 | `<CR>`, double click | go to the agent |
 | `g` | go to the lines |
-| `d` | forget this conversation, after a confirm |
+| `d` | forget this conversation, or every selected one, after a confirm |
+| `<Tab>` | select a row |
 | `/` | search |
 | `q` | close |
 | `?` | every key, snacks' own too |
