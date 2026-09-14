@@ -178,6 +178,7 @@ function M.turns(c)
 end
 
 local repo_count = {}
+M.COUNT_TTL = 60000
 
 --- How many conversations a repository holds, not counting the ones whose
 --- transcript is gone. Cached until the store file changes, because the
@@ -188,7 +189,8 @@ local repo_count = {}
 function M.count_repo(repo)
   local r = links.repo(repo)
   local c = repo_count[repo]
-  if c and c.offset == r.offset and c.records == #r.records then
+  local now = vim.uv.now()
+  if c and c.offset == r.offset and c.records == #r.records and now - c.at < M.COUNT_TTL then
     return c.count
   end
   -- `gone` is a file check, so ask it once per conversation, not per record.
@@ -206,7 +208,7 @@ function M.count_repo(repo)
       n = n + 1
     end
   end
-  repo_count[repo] = { offset = r.offset, records = #r.records, count = n }
+  repo_count[repo] = { offset = r.offset, records = #r.records, count = n, at = now }
   return n
 end
 

@@ -3,8 +3,9 @@
 -- The file is read once, then only its tail: the byte offset after the last
 -- complete line is remembered, and a change reads what came after it. A
 -- writer may be mid-line when we look, so a trailing partial line waits for
--- the next read. A file that got shorter was rewritten (a "forget" command,
--- later) and is read again from the start.
+-- the next read. Forgetting appends a tombstone, which removes matching
+-- records already in memory without racing an agent writer. A shorter file is
+-- treated as an external rewrite and read again from the start.
 --
 -- A watcher on the store folder and `FocusGained` both trigger a read; the
 -- `User LexStoreChanged` autocmd tells the marks and the pending list. Two
@@ -104,10 +105,40 @@ local function reset(r)
   r.records, r.by_file, r.dirs, r.offset = {}, {}, {}, 0
 end
 
+local function record_key(rec)
+  if rec.dir then
+    return "dir:" .. rec.dir
+  elseif not rec.from then
+    return "file:" .. tostring(rec.file)
+  end
+  return ("range:%s:%d-%d"):format(tostring(rec.file), rec.from, rec.to)
+end
+
+local function apply_forget(r, tombstone)
+  local kept, removed = {}, 0
+  for _, rec in ipairs(r.records) do
+    local match = rec.session == tombstone.session and (not tombstone.key or record_key(rec) == tombstone.key)
+    if match then
+      removed = removed + 1
+    else
+      kept[#kept + 1] = rec
+    end
+  end
+  if removed == 0 then
+    return false
+  end
+  r.records, r.by_file, r.dirs = {}, {}, {}
+  for _, rec in ipairs(kept) do
+    add(r, rec)
+  end
+  return true
+end
+
 --- Read what is new in the file. Returns whether anything was added.
 ---@param r lex.Repo
 ---@return boolean
 function M.refresh(r)
+  store.migrate(r.repo)
   local st = vim.uv.fs_stat(r.file)
   if not st then
     if r.offset > 0 then
@@ -135,15 +166,17 @@ function M.refresh(r)
   end
   local chunk = data:sub(1, last)
   r.offset = r.offset + #chunk
-  local added = 0
+  local changed_store = false
   for line in chunk:gmatch("(.-)\n") do
     local ok, rec = pcall(vim.json.decode, line)
-    if ok and type(rec) == "table" and rec.path and rec.session then
+    if ok and type(rec) == "table" and rec._lex == "forget" and rec.session then
+      changed_store = apply_forget(r, rec) or changed_store
+    elseif ok and type(rec) == "table" and rec.path and rec.session and rec.repo == r.repo then
       add(r, rec)
-      added = added + 1
+      changed_store = true
     end
   end
-  return added > 0
+  return changed_store
 end
 
 local function changed(r)
@@ -429,8 +462,8 @@ end
 ---@param repo string
 ---@param drop fun(rec: lex.Record): boolean
 ---@return integer removed, string|nil err
-local function forget(repo, drop)
-  local removed, err = store.forget(repo, drop)
+local function forget(repo, target)
+  local removed, err = store.forget(repo, target)
   if removed > 0 then
     local r = M.repo(repo)
     reset(r)
@@ -445,9 +478,7 @@ end
 ---@param session string
 ---@return integer removed, string|nil err
 function M.forget_session(repo, session)
-  return forget(repo, function(rec)
-    return rec.session == session
-  end)
+  return forget(repo, { session = session })
 end
 
 --- Forget one place of a conversation: every record with the same session
@@ -457,10 +488,7 @@ end
 ---@param key string   from lex.conv.key
 ---@return integer removed, string|nil err
 function M.forget_place(repo, session, key)
-  local conv = require("lex.conv")
-  return forget(repo, function(rec)
-    return rec.session == session and conv.key(rec) == key
-  end)
+  return forget(repo, { session = session, key = key })
 end
 
 --- Forget the cached roots; tests call it between repositories.

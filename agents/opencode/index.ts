@@ -7,7 +7,7 @@
 // the call that carries the user's parts before the message is saved, and
 // writes the same records to the same store:
 //
-//   $LEX_HOME/<repo-slug>/links.jsonl      ($LEX_HOME defaults to ~/.lex)
+//   $LEX_HOME/<repo-slug>--<hash>/links.jsonl  ($LEX_HOME defaults to ~/.lex)
 //
 // and the same session state file the Lua writer keeps, `working` on
 // `chat.message`, `idle` on the `session.idle` event, and `ended` for every
@@ -40,6 +40,7 @@
 // agent, so every entry point is wrapped, and an error goes to
 // $LEX_HOME/hook.log.
 
+import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -223,7 +224,11 @@ function home(): string {
 }
 
 function slug(repo: string): string {
-  return repo.replace(/[^A-Za-z0-9]/g, "-");
+  let readable = repo.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (readable === "") readable = "repo";
+  else if (readable.length > 48) readable = readable.slice(-48);
+  const hash = createHash("sha256").update(repo).digest("hex").slice(0, 16);
+  return `${readable}--${hash}`;
 }
 
 function log(msg: string): void {

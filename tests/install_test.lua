@@ -193,7 +193,8 @@ eq(read(settings), "[1, 2]\n", "claude: the bad file is untouched")
 
 local config = install.paths().codex
 local function cblock(event)
-  return ('[[hooks.%s]]\nhooks = [{ type = "command", command = "%s -l %s --agent codex" }]\n'):format(event, nvim, hook)
+  local timeout = event == "SessionEnd" and 3 or 5
+  return ('[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = "command"\ncommand = "%s -l %s --agent codex"\ntimeout = %d\n'):format(event, event, nvim, hook, timeout)
 end
 local function cblocks(events)
   local out = {}
@@ -225,6 +226,14 @@ eq({ install.codex() }, { "installed", config }, "codex: an older config gets th
 eq(read(config), cblocks(ALL), "codex: only the missing blocks were appended")
 eq({ install.codex() }, { "present", config }, "codex: then present")
 eq(#vim.fn.glob(config .. ".backup.*", false, true), 2, "codex: a second backup in the same second keeps the first")
+
+-- The installer still recognizes its pre-0.2 inline-array form, so upgrading
+-- does not create duplicate handlers.
+local legacy_codex = cblocks({ "Stop", "SessionStart", "SessionEnd" })
+  .. ('\n[[hooks.UserPromptSubmit]]\nhooks = [{ type = "command", command = "%s -l %s --agent codex" }]\n'):format(nvim, hook)
+write(config, legacy_codex)
+eq({ install.codex() }, { "present", config }, "codex: a legacy inline entry is recognized")
+eq(read(config), legacy_codex, "codex: recognizing legacy syntax writes nothing")
 
 write(config, 'model = "gpt-5"')
 install.codex()

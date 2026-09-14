@@ -6,6 +6,7 @@
 // must agree on every field, hashes included.
 
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -25,6 +26,12 @@ function eq(got: unknown, want: unknown, what: string): void {
 }
 
 type Rec = Record<string, unknown>;
+
+function slug(repo: string): string {
+  let readable = repo.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "repo";
+  if (readable.length > 48) readable = readable.slice(-48);
+  return `${readable}--${createHash("sha256").update(repo).digest("hex").slice(0, 16)}`;
+}
 
 function records(home: string): Rec[] {
   const all: Rec[] = [];
@@ -82,7 +89,8 @@ for (const [i, r] of got.entries()) {
   eq(r.transcript, undefined, `record ${i} has no transcript`);
   eq(typeof r.at === "number" && Math.abs((r.at as number) - Date.now() / 1000) < 60, true, `record ${i} at`);
 }
-eq(readdirSync(home).sort(), ["-Users-lukas-Projects-aaa", "-Users-lukas-Projects-other", "sessions"], "one folder per repository, slugged, plus the sessions folder");
+eq(readdirSync(home).sort(), [slug("/Users/lukas/Projects/aaa"), slug("/Users/lukas/Projects/other"), "sessions"].sort(), "one collision-resistant folder per repository, plus the sessions folder");
+eq(slug("/a-b/c") === slug("/a/b-c"), false, "colliding readable paths have different hashes");
 eq(existsSync(join(home, "hook.log")), false, "no hook.log");
 
 // a second prompt appends

@@ -19,6 +19,10 @@
 --   g     go to the lines in the file
 --   d     forget this conversation, after a confirm
 --   q     close
+--   ?     every key, snacks' own too
+--
+-- The footer of the list says `<CR>`, `g`, `d` and `?`, so nobody has to
+-- know them.
 --
 -- The right-click menu inside this picker offers the same, through
 -- `menu_action`; mac-setup's ai-ref.lua draws it.
@@ -466,6 +470,7 @@ local function previewer(scope)
       item.answer_read = true
       local answer, pending = M.last_answer(rec, function(text)
         item.answer = text
+        item.pending = false
         local ok, current = pcall(function()
           return ctx.picker:current()
         end)
@@ -595,6 +600,125 @@ function M.forget(item, scope, only_place)
   return removed > 0
 end
 
+-- ── the keys, at the foot of the list ──────────────────────────────────────
+
+--- The keys only Lex gives this picker, most wanted first, and `?` for the
+--- rest of snacks' own (Lukas, 2026-09-14). The picker starts typing into
+--- the search, so the letters are letters there until `Esc`; the footer
+--- says so instead of leaving a `d` that searches for "d".
+local KEYS = {
+  { "<CR>", "open agent" },
+  { "g", "go to lines", esc = true },
+  { "d", "forget", esc = true },
+  { "?", "all keys", esc = true },
+}
+
+--- The footer for a window `width` cells wide: as many keys as fit, the
+--- last ones dropped first. Too long is not an option: nvim keeps the END
+--- of a footer that does not fit, which cut `<CR>` away first (130 columns,
+--- 2026-09-14). Nil when not even the first fits, or with no width the
+--- whole of it.
+---@param width? integer
+---@return string[][]|nil
+function M.footer(width)
+  for n = #KEYS, 1, -1 do
+    local out, esc = {}, false
+    for i = 1, n do
+      local k = KEYS[i]
+      if k.esc and not esc then
+        esc = true
+        out[#out + 1] = { "  Esc, then", "SnacksFooter" }
+      end
+      out[#out + 1] = { " ", "SnacksFooter" }
+      out[#out + 1] = { " " .. k[1] .. " ", "SnacksFooterKey" }
+      out[#out + 1] = { " " .. k[2] .. " ", "SnacksFooterDesc" }
+    end
+    out[#out + 1] = { " ", "SnacksFooter" }
+    local cells = 0
+    for _, chunk in ipairs(out) do
+      cells = cells + vim.api.nvim_strwidth(chunk[1])
+    end
+    if not width or cells <= width then
+      return out
+    end
+  end
+  return nil
+end
+
+--- Fit the keys to the window that carries them, now and after every
+--- resize while the picker is open: a resize moves the windows but keeps
+--- them, so nothing else redraws the footer for the new width.
+---@param picker table  a snacks picker
+local function fit_keys(picker)
+  local function fit()
+    if picker.closed then
+      return
+    end
+    local wins = vim.list_extend(vim.tbl_values(picker.layout.box_wins), vim.tbl_values(picker.layout.wins))
+    for _, win in ipairs(wins) do
+      if win.opts.lex_keys and win:valid() then
+        local footer = M.footer(vim.api.nvim_win_get_width(win.win))
+        if not vim.deep_equal(footer, win.opts.footer) then
+          win.opts.footer = footer
+          win:update()
+        end
+      end
+    end
+  end
+  fit()
+  vim.api.nvim_create_autocmd({ "VimResized", "WinResized" }, {
+    callback = function()
+      if picker.closed then
+        return true
+      end
+      vim.schedule(fit)
+    end,
+  })
+end
+
+local NO_BOTTOM = { [""] = true, none = true, top = true, left = true, right = true, hpad = true }
+
+--- True when a border draws a bottom edge, the only place a footer shows.
+---@param border any  a snacks border: true, a name, or nvim's list of chars
+---@return boolean
+local function has_bottom(border)
+  if type(border) == "table" then
+    -- nvim repeats a short list, so the bottom edge is char 6 of 8
+    local c = border[5 % #border + 1]
+    c = type(c) == "table" and c[1] or c
+    return c ~= nil and c ~= ""
+  end
+  return border == true or (type(border) == "string" and not NO_BOTTOM[border])
+end
+
+--- A resolved snacks layout with the keys at its foot: on the box or window
+--- that carries the picker's title, which is the list's frame in the
+--- default preset, else on the list itself. A layout where neither has a
+--- bottom edge (`ivy`) shows no keys; `?` still lists them.
+---@param layout table  what `Snacks.picker.config.layout` returns
+---@return table
+function M.with_keys(layout)
+  local titled, list
+  local function walk(node)
+    if type(node.title) == "string" and node.title:find("{title}", 1, true) then
+      titled = titled or node
+    end
+    if node.win == "list" then
+      list = node
+    end
+    for _, child in ipairs(node) do
+      walk(child)
+    end
+  end
+  walk(layout.layout)
+  local target = (titled and has_bottom(titled.border) and titled) or (list and has_bottom(list.border) and list)
+  if target then
+    target.footer = M.footer()
+    target.lex_keys = true
+  end
+  return layout
+end
+
 -- ── the picker ─────────────────────────────────────────────────────────────
 
 local last_scope
@@ -619,6 +743,16 @@ function M.pick(scope)
   Snacks.picker.pick({
     source = "lex",
     title = scope.title,
+    -- The layout the user chose, resolved the way snacks resolves it, with
+    -- the keys added. A function, so a resize that picks another preset
+    -- gets them again. Its `config` hook has run once here and must not run
+    -- a second time when snacks resolves the result.
+    layout = function(source)
+      local layout = Snacks.picker.config.layout(Snacks.picker.config.get({ source = source }))
+      layout.config = nil
+      return M.with_keys(layout)
+    end,
+    on_show = fit_keys,
     items = items,
     format = formatter(scope),
     preview = previewer(scope),
@@ -658,6 +792,22 @@ end
 
 -- ── scopes ─────────────────────────────────────────────────────────────────
 
+local SCOPE_WORDS = { file = "this file", folder = "folder", repo = "whole project" }
+
+--- A picker's title: the scope in words, then the path or the project's
+--- name. The words come first and in the same spot for every scope, so the
+--- file's picker and the whole project's tell themselves apart at a glance
+--- (Lukas, 2026-09-14), and a long path cut at the window's edge still
+--- leaves them.
+---@param kind "range"|"file"|"folder"|"repo"
+---@param what string  the path, or the project's name
+---@param row? integer the row, for a range
+---@return string
+function M.title(kind, what, row)
+  local words = kind == "range" and ("line %d"):format(row) or SCOPE_WORDS[kind]
+  return ("Lex · %s · %s"):format(words, what)
+end
+
 --- The scope for the row under the cursor in a buffer: the range when the
 --- row has links, else the whole file.
 ---@param buf integer
@@ -669,9 +819,9 @@ function M.scope_at(buf, row)
     return nil
   end
   if marks.count_at(buf, row) > 0 then
-    return { kind = "range", repo = st.repo, rel = st.file, buf = buf, row = row, title = ("Lex · line %d of %s"):format(row, vim.fs.basename(st.file)) }
+    return { kind = "range", repo = st.repo, rel = st.file, buf = buf, row = row, title = M.title("range", vim.fs.basename(st.file), row) }
   end
-  return { kind = "file", repo = st.repo, rel = st.file, buf = buf, title = "Lex · " .. st.file }
+  return { kind = "file", repo = st.repo, rel = st.file, buf = buf, title = M.title("file", st.file) }
 end
 
 --- The scope for a path from the explorer.
@@ -682,10 +832,10 @@ function M.scope_for(path, is_dir)
   local repo, root = links.roots(path)
   local rel = require("lex.place").relative(vim.uv.fs_realpath(path) or path, root)
   if is_dir then
-    return { kind = "folder", repo = repo, rel = rel, title = "Lex · " .. (rel == "." and "/" or rel .. "/") }
+    return { kind = "folder", repo = repo, rel = rel, title = M.title("folder", rel == "." and "/" or rel .. "/") }
   end
   local buf = vim.fn.bufnr(path)
-  return { kind = "file", repo = repo, rel = rel, buf = buf ~= -1 and buf or nil, title = "Lex · " .. rel }
+  return { kind = "file", repo = repo, rel = rel, buf = buf ~= -1 and buf or nil, title = M.title("file", rel) }
 end
 
 --- Everything in the repository the buffer belongs to.
@@ -697,7 +847,7 @@ function M.scope_repo(buf)
   if not repo then
     repo = links.roots(vim.fn.getcwd())
   end
-  return { kind = "repo", repo = repo, title = "Lex · " .. vim.fs.basename(repo) .. " · every conversation" }
+  return { kind = "repo", repo = repo, title = M.title("repo", vim.fs.basename(repo)) }
 end
 
 -- ── the right-click menu ───────────────────────────────────────────────────

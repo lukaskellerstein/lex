@@ -1,4 +1,4 @@
--- lex.copy: `📌 Copy Lex Place`, the one gesture the user makes.
+-- lex.copy: `📌 Pin Lex Place`, the one gesture the user makes.
 --
 -- One entry point, two surfaces, dispatched on the buffer:
 --

@@ -121,5 +121,21 @@ eq(
 eq(locate.by_open_files({}, ""), {}, "by_open_files: nothing open")
 eq(locate.by_open_files({}, "n/no/process/line.jsonl\n"), {}, "by_open_files: a name with no process before it is skipped")
 
+-- Optional system tools really are optional: a minimal PATH is an empty
+-- snapshot, not an exception from vim.system().
+local old_path = vim.env.PATH
+local empty_path = vim.fn.tempname()
+vim.fn.mkdir(empty_path, "p")
+vim.env.PATH = empty_path
+eq(locate.processes(), {}, "optional tools: missing ps is an empty process list")
+eq(locate.panes_full(), {}, "optional tools: missing tmux is an empty pane list")
+eq(locate.by_open_files({ "/some/file" }), {}, "optional tools: missing lsof finds no open files")
+local open = require("lex.open")
+require("lex").config.terminal = function() return true end
+eq(open.targets(), { { label = "new terminal", terminal = true } }, "optional tools: missing tmux leaves the terminal target")
+eq(open.jump({ pane = "%999" }), false, "optional tools: a tmux jump fails quietly when tmux is missing")
+vim.env.PATH = old_path
+vim.fn.delete(empty_path, "rf")
+
 io.stdout:write(("%d checks, %d failed\n"):format(checks, failed))
 os.exit(failed == 0 and 0 or 1)

@@ -6,6 +6,7 @@
 
 local root = vim.fs.dirname(vim.fs.dirname(vim.fs.normalize(vim.fn.fnamemodify(_G.arg[0], ":p"))))
 vim.opt.runtimepath:prepend(root)
+local store = require("lex.store")
 
 local checks, failed = 0, 0
 local function eq(got, want, what)
@@ -106,7 +107,9 @@ for i, r in ipairs(got) do
 end
 local dirs = vim.fn.glob(home .. "/*", false, true)
 table.sort(dirs)
-eq(vim.tbl_map(vim.fs.basename, dirs), { "-Users-lukas-Projects-aaa", "-Users-lukas-Projects-other", "sessions" }, "claude: one folder per repository, slugged, plus the sessions folder")
+local expected_dirs = { store.slug("/Users/lukas/Projects/aaa"), store.slug("/Users/lukas/Projects/other"), "sessions" }
+table.sort(expected_dirs)
+eq(vim.tbl_map(vim.fs.basename, dirs), expected_dirs, "claude: one collision-resistant folder per repository, plus the sessions folder")
 io.stdout:write(("  the hook took %.0f ms\n"):format(out.ms))
 if out.ms > 100 then
   io.stdout:write("  WARN slower than the 50 ms budget\n")
@@ -126,17 +129,53 @@ eq(#records(home), 10, "codex: a second prompt appends five more")
 
 -- the store reader
 vim.env.LEX_HOME = home
-local store = require("lex.store")
-eq(store.slug("/Users/lukas/Projects/aaa/.worktrees/x_1"), "-Users-lukas-Projects-aaa--worktrees-x-1", "store: the slug rule")
-eq(store.file("/a/b"), home .. "/-a-b/links.jsonl", "store: the file for a repo")
+eq(store.slug("/Users/lukas/Projects/aaa/.worktrees/x_1"):match("^Users%-lukas%-Projects%-aaa%-worktrees%-x%-1%-%-[0-9a-f]+$") ~= nil, true, "store: the slug is readable and hashed")
+eq(store.legacy_slug("/a-b/c"), store.legacy_slug("/a/b-c"), "store: the old slug could collide")
+eq(store.slug("/a-b/c") == store.slug("/a/b-c"), false, "store: the new slug separates colliding paths")
+eq(store.file("/a/b"), home .. "/" .. store.slug("/a/b") .. "/links.jsonl", "store: the file for a repo")
 eq(#store.read("/Users/lukas/Projects/aaa"), 8, "store: read one repository")
 eq(#store.read("/Users/lukas/Projects/other"), 2, "store: read the other")
 eq(store.read("/nowhere"), {}, "store: an unknown repo is empty")
-eq(store.repos(), { { slug = "-Users-lukas-Projects-aaa", count = 8 }, { slug = "-Users-lukas-Projects-other", count = 2 } }, "store: repos()")
+local expected_repos = { { slug = store.slug("/Users/lukas/Projects/aaa"), count = 8 }, { slug = store.slug("/Users/lukas/Projects/other"), count = 2 } }
+table.sort(expected_repos, function(a, b) return a.slug < b.slug end)
+eq(store.repos(), expected_repos, "store: repos()")
 local f = assert(io.open(store.file("/Users/lukas/Projects/other"), "a"))
 f:write("{not json\n")
 f:close()
 eq(#store.read("/Users/lukas/Projects/other"), 2, "store: a bad line is skipped")
+
+-- stores from 0.1.0 migrate lazily. Exact repo filtering separates paths
+-- that shared the same lossy directory, and the old file remains untouched.
+local migrate_home = tmp .. "/migrate"
+vim.env.LEX_HOME = migrate_home
+local repo_a, repo_b = "/a-b/c", "/a/b-c"
+eq(store.legacy_file(repo_a), store.legacy_file(repo_b), "migration: fixture really collides")
+vim.fn.mkdir(vim.fs.dirname(store.legacy_file(repo_a)), "p")
+local legacy = assert(io.open(store.legacy_file(repo_a), "w"))
+legacy:write(vim.json.encode({ repo = repo_a, path = repo_a .. "/a.lua", file = "a.lua", session = "a", index = 1, of = 1 }), "\n")
+legacy:write(vim.json.encode({ repo = repo_b, path = repo_b .. "/b.lua", file = "b.lua", session = "b", index = 1, of = 1 }), "\n")
+legacy:close()
+eq(vim.tbl_map(function(r) return r.session end, store.read(repo_a)), { "a" }, "migration: only the exact first repo is copied")
+eq(vim.tbl_map(function(r) return r.session end, store.read(repo_b)), { "b" }, "migration: only the exact second repo is copied")
+eq(vim.fn.filereadable(store.legacy_file(repo_a)), 1, "migration: the legacy file is retained")
+legacy = assert(io.open(store.legacy_file(repo_a), "a"))
+legacy:write(vim.json.encode({ repo = repo_a, path = repo_a .. "/later.lua", file = "later.lua", session = "later", index = 1, of = 1 }), "\n")
+legacy:close()
+eq(vim.tbl_map(function(r) return r.session end, store.read(repo_a)), { "a", "later" }, "migration: a late legacy append is imported incrementally")
+
+-- Forgetting is append-only: a writer can append a new prompt after the
+-- marker without that new record being lost or hidden.
+local race_repo = "/race/repo"
+vim.fn.mkdir(vim.fs.dirname(store.file(race_repo)), "p")
+local race = assert(io.open(store.file(race_repo), "w"))
+race:write(vim.json.encode({ repo = race_repo, path = race_repo .. "/x.lua", file = "x.lua", session = "same", index = 1, of = 1 }), "\n")
+race:close()
+eq(store.forget(race_repo, { session = "same" }), 1, "forget marker: removes the record visible at that moment")
+race = assert(io.open(store.file(race_repo), "a"))
+race:write(vim.json.encode({ repo = race_repo, path = race_repo .. "/y.lua", file = "y.lua", session = "same", index = 1, of = 1 }), "\n")
+race:close()
+eq(vim.tbl_map(function(r) return r.file end, store.read(race_repo)), { "y.lua" }, "forget marker: a later append with the same session survives")
+eq(#vim.fn.readfile(store.file(race_repo)), 3, "forget marker: history is appended, never rewritten")
 vim.env.LEX_HOME = nil
 
 -- outside tmux: no pane

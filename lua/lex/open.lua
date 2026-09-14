@@ -31,9 +31,21 @@ local function notify(msg, level)
 end
 
 local function tmux(args)
+  if vim.fn.executable("tmux") ~= 1 then
+    return false, "", "tmux is not installed"
+  end
   local cmd = { "tmux" }
   vim.list_extend(cmd, args)
-  local out = vim.system(cmd, { text = true }):wait()
+  local ok, proc = pcall(vim.system, cmd, { text = true })
+  if not ok then
+    return false, "", tostring(proc)
+  end
+  local waited, out = pcall(function()
+    return proc:wait()
+  end)
+  if not waited then
+    return false, "", tostring(out)
+  end
   return out.code == 0, vim.trim(out.stdout or ""), vim.trim(out.stderr or "")
 end
 

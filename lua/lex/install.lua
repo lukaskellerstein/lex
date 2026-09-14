@@ -196,27 +196,31 @@ function M.codex_command()
   return sh(M.nvim_path()) .. " -l " .. sh(M.hook_path()) .. " --agent codex"
 end
 
---- Does any `[[hooks.<event>]]` block in a TOML text name our hook? A block
---- runs from its header to the next `[` header, and the same event can have
---- several blocks in the file (the inbox's first, ours after it).
+--- Does any `[[hooks.<event>]]` group in a TOML text name our hook? Supports
+--- both Codex's documented nested handler tables and Lex's older inline-array
+--- form, so an upgrade does not install a duplicate.
 function M.codex_has(text, event, hook)
-  local pos = 1
-  while true do
-    local s, e = text:find("[[hooks." .. event .. "]]", pos, true)
-    if not s then
-      return false
+  local current
+  for line in (text .. "\n"):gmatch("(.-)\n") do
+    local parent = line:match("^%s*%[%[hooks%.([%w_]+)%]%]%s*$")
+    if parent then
+      current = parent
+    elseif line:match("^%s*%[") then
+      local handler = current and ("[[hooks.%s.hooks]]"):format(current)
+      if not (handler and line:find(handler, 1, true)) then
+        current = nil
+      end
     end
-    local nxt = text:find("\n%[", e) or #text + 1
-    if text:sub(e, nxt):find(hook, 1, true) then
+    if current == event and line:find(hook, 1, true) then
       return true
     end
-    pos = nxt
   end
+  return false
 end
 
---- Install into Codex's config.toml: one `[[hooks.UserPromptSubmit]]` and
---- one `[[hooks.Stop]]` block, appended. Codex rewrites this file itself, so
---- the blocks are appended, never merged, and the file is backed up first.
+--- Install into Codex's config.toml: one documented nested handler table for
+--- each lifecycle event. Codex rewrites this file itself, so the blocks are
+--- appended, never merged, and the file is backed up first.
 --- Idempotent by content: a block that names the hook path is present.
 ---@return string status, string file
 function M.codex()
@@ -229,7 +233,8 @@ function M.codex()
   local blocks = {}
   for _, event in ipairs(M.EVENTS) do
     if not M.codex_has(text, event, hook) then
-      blocks[#blocks + 1] = ("[[hooks.%s]]\nhooks = [{ type = \"command\", command = \"%s\" }]\n"):format(event, toml(M.codex_command()))
+      local timeout = event == "SessionEnd" and 3 or 5
+      blocks[#blocks + 1] = ("[[hooks.%s]]\n\n[[hooks.%s.hooks]]\ntype = \"command\"\ncommand = \"%s\"\ntimeout = %d\n"):format(event, event, toml(M.codex_command()), timeout)
     end
   end
   if #blocks == 0 then

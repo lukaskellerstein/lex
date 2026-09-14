@@ -1,0 +1,11 @@
+nvim.log
+.DS_Store
+
+# Claude Code
+.claude/settings.local.json
+.worktrees/
+
+# secrets never enter the repo — .claude/rules/12-security.md
+.env
+.envrc
+*.key

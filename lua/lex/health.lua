@@ -105,13 +105,16 @@ function M.check()
     end
     health.ok(("%s: %d repositories, %d links"):format(home, #repos, total))
     local sessions, working, ended = 0, 0, 0
-    for name in vim.fs.dir(home .. "/sessions") do
-      sessions = sessions + 1
-      local st = read(home .. "/sessions/" .. name)
-      if st and st:find('"working"', 1, true) then
-        working = working + 1
-      elseif st and st:find('"ended"', 1, true) then
-        ended = ended + 1
+    local sessions_dir = home .. "/sessions"
+    if vim.fn.isdirectory(sessions_dir) == 1 then
+      for name in vim.fs.dir(sessions_dir) do
+        sessions = sessions + 1
+        local st = read(sessions_dir .. "/" .. name)
+        if st and st:find('"working"', 1, true) then
+          working = working + 1
+        elseif st and st:find('"ended"', 1, true) then
+          ended = ended + 1
+        end
       end
     end
     health.info(("%d session state files: %d working, %d ended, %d idle"):format(sessions, working, ended, sessions - working - ended))

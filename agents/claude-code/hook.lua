@@ -22,12 +22,11 @@
 --   * On UserPromptSubmit, the prompt is scanned for `<lex-place …>…</lex-place>`
 --     and `<lex-place …/>` blocks; one record per block is appended to
 --
---       $LEX_HOME/<repo-slug>/links.jsonl      ($LEX_HOME defaults to ~/.lex)
+--       $LEX_HOME/<repo-slug>--<hash>/links.jsonl  ($LEX_HOME defaults to ~/.lex)
 --
---     where <repo-slug> is the block's `repo` with every character that is
---     not a letter or a digit turned into `-`, the rule Claude Code uses for
---     ~/.claude/projects/. One file per repository keeps the editor's reads
---     small.
+--     The readable slug is followed by a hash of the exact repository path,
+--     so different paths cannot share a store. One file per repository keeps
+--     the editor's reads small.
 --
 -- Rules that keep this file honest:
 --
@@ -239,7 +238,13 @@ local function home()
 end
 
 local function slug(repo)
-  return (repo:gsub("[^A-Za-z0-9]", "-"))
+  local readable = repo:gsub("[^A-Za-z0-9]+", "-"):gsub("^-+", ""):gsub("-+$", "")
+  if readable == "" then
+    readable = "repo"
+  elseif #readable > 48 then
+    readable = readable:sub(-48)
+  end
+  return readable .. "--" .. vim.fn.sha256(repo):sub(1, 16)
 end
 
 local function log(msg)

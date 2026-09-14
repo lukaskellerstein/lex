@@ -53,9 +53,12 @@ store with `records.json`:
   vectors: `""` → `811c9dc5`, `"a"` → `e40c292c`, `"foobar"` → `bf9cf968`.
 - `prompt` is the first non-blank line of the text outside the blocks,
   trimmed and cut the same way; `""` when there is none.
-- The store file is `$LEX_HOME/<slug>/links.jsonl`, `$LEX_HOME` defaulting
-  to `~/.lex`, and `<slug>` is the block's `repo` with every character that
-  is not an ASCII letter or digit replaced by `-`.
+- The store file is
+  `$LEX_HOME/<readable-repo>--<sha256-prefix>/links.jsonl`, `$LEX_HOME`
+  defaulting to `~/.lex`. The readable part collapses non-ASCII-alphanumeric
+  runs to `-` and is capped at 48 bytes; the first 16 SHA-256 hex characters
+  of the exact `repo` path prevent collisions. Readers also require the
+  record's exact `repo` value to match.
 - The session fields (`at`, `agent`, `session`, `pid`, `pane`, `transcript`,
   `cwd`) are not in `records.json`; each test checks them for its own writer.
 - Key order inside a record is not part of the contract. Readers decode.

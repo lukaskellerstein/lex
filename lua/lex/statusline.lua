@@ -90,7 +90,7 @@ function M.click(button)
     end
     return picker.pick(scope)
   end
-  picker.pick({ kind = "file", repo = st.repo, rel = st.file, buf = buf, title = "Lex · " .. st.file })
+  picker.pick({ kind = "file", repo = st.repo, rel = st.file, buf = buf, title = picker.title("file", st.file) })
 end
 
 return M

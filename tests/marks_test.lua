@@ -243,6 +243,32 @@ eq(items[#items].conv.session, "s-whole", "picker: the gone one last")
 items = picker.items({ kind = "folder", repo = main, rel = "src" })
 eq(#items, 8, "picker: eight under src")
 eq(#picker.items({ kind = "repo", repo = main }), 8, "picker: the repo scope, every conversation")
+-- the file's picker and the project's name their scope in the same spot
+eq(picker.title("file", "src/auth/login.lua"), "Lex · this file · src/auth/login.lua", "picker: the file's title")
+eq(picker.title("repo", "main"), "Lex · whole project · main", "picker: the project's title")
+eq(picker.title("range", "login.lua", 15), "Lex · line 15 · login.lua", "picker: a range's title")
+eq(picker.title("folder", "src/"), "Lex · folder · src/", "picker: a folder's title")
+-- the keys at the foot of the list: all of them when there is room, the last
+-- ones dropped first, never cut (nvim would keep the end)
+local function cells(footer)
+  local n = 0
+  for _, chunk in ipairs(footer or {}) do
+    n = n + vim.api.nvim_strwidth(chunk[1])
+  end
+  return n
+end
+local full = picker.footer()
+eq(full[2][1], " <CR> ", "picker: the footer starts with <CR>")
+eq(cells(picker.footer(cells(full))), cells(full), "picker: the whole footer when it fits")
+local cut = picker.footer(cells(full) - 1)
+eq(cut[#cut - 1][1], " forget ", "picker: the last key dropped first")
+eq(picker.footer(5), nil, "picker: no footer when not even <CR> fits")
+local default = { layout = { box = "horizontal", { box = "vertical", border = true, title = "{title} {live} {flags}", { win = "input", border = "bottom" }, { win = "list", border = "none" } }, { win = "preview", border = true } } }
+picker.with_keys(default)
+eq(default.layout[1].lex_keys, true, "picker: the keys on the frame that carries the title")
+local ivy = { layout = { box = "vertical", border = "top", title = " {title} {live} {flags}", { win = "input", border = "bottom" }, { box = "horizontal", { win = "list", border = "none" }, { win = "preview", border = "left" } } } }
+picker.with_keys(ivy)
+eq({ ivy.layout.lex_keys, ivy.layout[2][1].lex_keys }, {}, "picker: no keys where nothing has a bottom edge")
 eq(picker.last_answer(r.records[1]), "Because the gateway drops calls.", "picker: the last answer from the transcript")
 eq(picker.last_answer(r.records[4]), nil, "picker: no answer when the transcript is gone")
 -- the newest answer wins, and only the tail of a long transcript is read
@@ -438,6 +464,23 @@ eq(#links.repo(main).records, before - 3, "forget: the store shrank by three in 
 eq(links.forget_session(main, "s-nothing-like-this"), 0, "forget: an unknown session removes nothing")
 marks.refresh(buf)
 eq(marks.state(buf).count, 7, "forget: the file is back to the seven it had")
+
+-- A transcript can disappear without the append-only store changing. The
+-- short count cache therefore expires and notices the lifecycle change.
+local count_repo = tmp .. "/count-repo"
+local count_transcript = tmp .. "/count-transcript.jsonl"
+vim.fn.writefile({ "{}" }, count_transcript)
+vim.fn.mkdir(vim.fs.dirname(store.file(count_repo)), "p")
+local count_file = assert(io.open(store.file(count_repo), "w"))
+count_file:write(vim.json.encode({ repo = count_repo, path = count_repo .. "/x.lua", file = "x.lua", session = "count-session", agent = "claude", transcript = count_transcript, at = os.time(), index = 1, of = 1, prompt = "count" }), "\n")
+count_file:close()
+local old_ttl = conv.COUNT_TTL
+conv.COUNT_TTL = 0
+eq(conv.count_repo(count_repo), 1, "count_repo: a present transcript counts")
+vim.fn.delete(count_transcript)
+links.repo(count_repo).records[1]._gone_at = os.time() - 61
+eq(conv.count_repo(count_repo), 0, "count_repo: an expired cache notices a deleted transcript")
+conv.COUNT_TTL = old_ttl
 
 -- a buffer that is not a file
 vim.cmd("enew")

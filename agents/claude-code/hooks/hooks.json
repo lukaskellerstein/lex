@@ -10,6 +10,39 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nvim -l \"${CLAUDE_PLUGIN_ROOT}/hook.lua\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nvim -l \"${CLAUDE_PLUGIN_ROOT}/hook.lua\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "nvim -l \"${CLAUDE_PLUGIN_ROOT}/hook.lua\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

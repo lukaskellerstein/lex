@@ -3,7 +3,7 @@
 --
 -- The modules:
 --   lex.place       the <lex-place> block: build, parse, and the repo roots
---   lex.copy        `📌 Copy Lex Place`: the one gesture, buffer or explorer
+--   lex.copy        `📌 Pin Lex Place`: the one gesture, buffer or explorer
 --   lex.store       where the links live ($LEX_HOME, ~/.lex) and how to read them
 --   lex.links       the store in memory: tail reads, a watcher, running and gone
 --   lex.anchor      where a record's lines are now: exact, then fuzzy, else orphaned
@@ -98,6 +98,9 @@ end
 
 ---@param opts? lex.Config
 function M.setup(opts)
+  if vim.fn.has("nvim-0.11") ~= 1 then
+    error("lex.nvim requires Neovim 0.11 or later", 2)
+  end
   M.config = vim.tbl_deep_extend("force", vim.deepcopy(defaults), opts or {})
   highlights()
   vim.api.nvim_create_autocmd("ColorScheme", {
@@ -107,7 +110,7 @@ function M.setup(opts)
   require("lex.marks").setup()
 end
 
---- `📌 Copy Lex Place`: the selected lines, the line under the cursor, or the
+--- `📌 Pin Lex Place`: the selected lines, the line under the cursor, or the
 --- explorer rows under the mouse, as `<lex-place>` blocks on the clipboard.
 --- The one call a keymap or a menu item needs.
 function M.copy()

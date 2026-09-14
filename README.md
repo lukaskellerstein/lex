@@ -12,17 +12,17 @@
 
 <p align="center">
   <a href="https://github.com/lukaskellerstein/lex"><img src="https://img.shields.io/badge/version-0.1.0-blue?style=flat-square" alt="Version" /></a>
-  <a href="https://neovim.io/"><img src="https://img.shields.io/badge/Neovim-0.10+-57A143?style=flat-square&logo=neovim&logoColor=white" alt="Neovim" /></a>
+  <a href="https://neovim.io/"><img src="https://img.shields.io/badge/Neovim-0.11+-57A143?style=flat-square&logo=neovim&logoColor=white" alt="Neovim" /></a>
   <a href="https://www.lua.org/"><img src="https://img.shields.io/badge/Lua-5.1_LuaJIT-2C2D72?style=flat-square&logo=lua&logoColor=white" alt="Lua" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
-  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.1-FBF0DF?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
+  <a href="https://bun.sh/"><img src="https://img.shields.io/badge/Bun-1.x-FBF0DF?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
   <a href="https://github.com/folke/snacks.nvim"><img src="https://img.shields.io/badge/snacks.nvim-picker-8FB4F0?style=flat-square" alt="snacks.nvim" /></a>
   <br />
   <a href="https://www.anthropic.com/claude-code"><img src="https://img.shields.io/badge/Claude_Code-hook-D97757?style=flat-square&logo=anthropic&logoColor=white" alt="Claude Code" /></a>
   <a href="https://github.com/openai/codex"><img src="https://img.shields.io/badge/Codex-hook-412991?style=flat-square&logoColor=white" alt="Codex" /></a>
   <a href="https://opencode.ai/"><img src="https://img.shields.io/badge/OpenCode-plugin-EACB4A?style=flat-square&logoColor=black" alt="OpenCode" /></a>
   <a href="https://github.com/tmux/tmux"><img src="https://img.shields.io/badge/tmux-optional-1BB91F?style=flat-square&logo=tmux&logoColor=white" alt="tmux" /></a>
-  <a href="#the-contract"><img src="https://img.shields.io/badge/tests-490_passing-brightgreen?style=flat-square" alt="Tests" /></a>
+  <a href="https://github.com/lukaskellerstein/lex/actions/workflows/tests.yml"><img src="https://github.com/lukaskellerstein/lex/actions/workflows/tests.yml/badge.svg" alt="Tests" /></a>
   <a href="#licence"><img src="https://img.shields.io/badge/licence-MIT-green?style=flat-square" alt="Licence" /></a>
 </p>
 
@@ -54,6 +54,8 @@ them, running or finished.
 
 Three conversations talked about these lines. Press one key and you are in one.
 
+![Lex marks and conversation picker](docs/demo.svg)
+
 Nothing about your day changes. Your Neovim config stays yours. The agent stays
 in its own terminal tab. The conversation stays in the agent's own history. Lex
 is only the memory between the two.
@@ -75,7 +77,7 @@ Three steps, about two minutes.
   event = "VeryLazy",
   opts = {},
   keys = {
-    { "<leader>ap", "<cmd>LexCopy<cr>", mode = { "n", "x" }, desc = "📌 Copy Lex Place" },
+    { "<leader>ap", "<cmd>LexCopy<cr>", mode = { "n", "x" }, desc = "📌 Pin Lex Place" },
     { "<leader>al", "<cmd>LexLinks<cr>", desc = "💬 Lex conversations here" },
   },
 }
@@ -176,7 +178,7 @@ again by their text, never by their old line number.
 
 | Command | What |
 |:--|:--|
-| `:LexCopy` | copy this place for an agent |
+| `:LexCopy` | pin this place and copy it for an agent |
 | `:LexLinks` | the conversations on the row under the cursor |
 | `:LexLinks file` | the conversations in this file |
 | `:LexLinks repo` | everything the agents talked about in this project |
@@ -269,7 +271,7 @@ local info = lex.info(path, is_dir)   -- per row
 ```
 
 A whole file or a whole folder is a place too: pick the row in the explorer and
-copy it. A folder place is one block however many files are under it, and it
+pin it. A folder place is one block however many files are under it, and it
 marks every one of them.
 
 ---
@@ -282,7 +284,7 @@ item covers every surface:
 
 ```lua
 for _, mode in ipairs({ "n", "x" }) do
-  vim.cmd(mode .. "noremenu PopUp.📌\\ Copy\\ Lex\\ Place <Cmd>LexCopy<CR>")
+  vim.cmd(mode .. "noremenu PopUp.📌\\ Pin\\ Lex\\ Place <Cmd>LexCopy<CR>")
 end
 ```
 
@@ -313,78 +315,78 @@ Two halves live in this repository.
 | **The reader** | `lex.nvim`. It paints the marks, counts the conversations, and takes you back into one | the repo root |
 
 The writer is small and strict. It never fails your prompt, never prints to
-stdout, runs no git and no network, and finishes in under 10 milliseconds. It is
-a single Lua file run by `nvim -l` for Claude Code and Codex, and a TypeScript
-plugin for OpenCode.
-
-### The store
+stdout, and runs no git or network. It is a single Lua file run by `nvim -l`
+for Claude Code and Codex, and a TypeScript plugin for OpenCode.
 
 ```
-~/.lex/<repo-slug>/links.jsonl     one line per place per prompt, append-only
-~/.lex/sessions/<session>.json     what each session is doing right now
-~/.lex/hook.log                    a writer that failed, one line
+~/.lex/<readable-repo>--<hash>/links.jsonl  records and forget markers
+~/.lex/sessions/<session>.json             live session state
+~/.lex/hook.log                            writer failures, if any
 ```
 
-`<repo-slug>` is the **main** repository root with every character that is not a
-letter or a digit turned into `-`, so a git worktree and the main checkout share
-one store. The store lives outside every repository, so nothing of yours is
-committed by accident.
+The hash prevents different repository paths from sharing a store. Upgrading
+from 0.1.0 incrementally imports matching records from the old lossy folder and
+leaves the old file in place. Forgetting appends a small marker, so it cannot
+overwrite a prompt another agent writes at the same moment.
 
-A record is a photo of the moment: the time, the agent, the session id, the
-process, the tmux pane, the transcript path, the file, the lines, the code
-itself, two lines of context each side, and the first line of your question.
-About 1 to 2 KB. It is never rewritten. Forgetting is the one exception, and it
-takes a lock.
-
-It is a plain file because three writers in three languages and one reader share
-it, and a file is the one interface all four have for free.
-
-### Going back into a conversation
-
-`<CR>` finds the session by three exact proofs, in order: its own state file, a
-live process whose command line carries the session id, and the process holding
-its transcript open. It then jumps to that tmux pane or that window. Nothing is
-guessed, and a stored pane is never trusted on its own, because the next session
-in that pane would take you to the wrong conversation.
-
-If nothing is running, you pick a new terminal or any tmux session, and Lex runs
-`claude --resume <id>`, `codex resume <id>` or `opencode -s <id>` there.
-
-### The contract
-
-`contract/` is what keeps three parsers in three languages equal: one prompt with
-every block form, the records it must produce, and the rules in words. Change the
-block in `lua/lex/place.lua`, in `agents/claude-code/hook.lua`, in
-`agents/opencode/index.ts` and in `contract/`, or in none of them.
+`contract/` keeps the three writers equal. Run the complete suite with:
 
 ```sh
 sh tests/run.sh
 ```
 
-Every test runs headless under `nvim -l`. The OpenCode writer's test runs under
-Bun when Bun is on your PATH.
+Every Lua test runs headless under `nvim -l`; the OpenCode writer test runs under
+Bun when Bun is available. The store format, session lookup, re-anchoring, and
+writer contract are described in [the architecture guide](docs/architecture.md).
 
 ---
 
-## Requirements
+## Compatibility
 
-| Need | Why |
+| Component | Supported / tested |
 |:--|:--|
-| Neovim 0.10 or later, 0.12 tested | the plugin, and the hook runs as `nvim -l` |
-| [snacks.nvim](https://github.com/folke/snacks.nvim) | the list, and the explorer counts |
-| git | the repository root is the key of the store |
-| tmux, optional | jumping to a running session, and resuming in a new window |
-| Bun, optional | only to run the OpenCode writer's test |
+| Neovim | 0.11+; CI tests 0.11 and the current stable release |
+| OS | macOS and Linux; Windows is not yet supported |
+| [snacks.nvim](https://github.com/folke/snacks.nvim) | required for the conversation picker; no minimum version pinned yet |
+| Claude Code | hook contract and installer tested; 2.1 tested end to end |
+| Codex | 0.154 contract and [hook config](https://developers.openai.com/codex/hooks) generation tested; live hook exercise pending |
+| OpenCode | 1.18 plugin contract and installer tested; wider live exercise pending |
+| tmux | optional; adds pane jumping and tmux resume targets |
+| Bun | optional; needed only to run the OpenCode writer test |
+
+Without tmux, Lex can still identify live agent processes and offer supported
+terminal launchers. `ps` and `lsof` improve live-session discovery when present;
+missing system tools degrade to fewer jump targets rather than an error.
+
+## Data and privacy
+
+Lex is local-only and makes no network requests. The store contains the code
+you copy, up to two surrounding lines, absolute paths, the first line of your
+prompt, agent session IDs, and transcript paths. By default it lives in
+`~/.lex`; set `$LEX_HOME` before starting Neovim and your agents to move it.
+
+Deleting a row with `d` appends a forget marker to Lex's store. It does not
+delete the agent's transcript. To erase everything Lex remembers, remove the
+store directory after closing Neovim and the agents.
+
+## Uninstall
+
+1. Remove the plugin from your Neovim plugin specification.
+2. Remove the Lex hook entries from `~/.claude/settings.json` and
+   `~/.codex/config.toml`, and remove
+   `~/.config/opencode/plugin/lex.ts` if you installed the OpenCode adapter.
+3. Optionally remove `~/.lex` (or `$LEX_HOME`) to delete stored links and
+   session state. This is permanent and does not affect agent transcripts.
 
 ## Status
 
-Early. The writers, the store, the marks, the list and the resume are built and
-tested, and Claude Code has run end to end. Codex and OpenCode are tested against
-the contract, but their wiring has not been exercised live yet.
+Early. The writers, store, marks, picker, installers, and resume flow are covered
+by automated tests. Claude Code has also run end to end; Codex and OpenCode have
+local contract and installer coverage but still need broader real-world testing.
 
-`PLAN.md` holds the whole design: every decision with its date, what was
+`PLAN.md` holds the design journal: every decision with its date, what was
 measured, what was rejected, and what is still open.
 
 ## Licence
 
-MIT.
+[MIT](LICENSE).

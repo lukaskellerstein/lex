@@ -31,6 +31,20 @@
 
 local M = {}
 
+local function run(argv, timeout)
+  if vim.fn.executable(argv[1]) ~= 1 then
+    return nil
+  end
+  local ok, proc = pcall(vim.system, argv, { text = true })
+  if not ok then
+    return nil
+  end
+  local waited, out = pcall(function()
+    return proc:wait(timeout)
+  end)
+  return waited and out or nil
+end
+
 ---@class lex.Location
 ---@field pid integer
 ---@field pane? string     the tmux pane, when it is in tmux
@@ -47,8 +61,8 @@ local M = {}
 ---@return table<integer, lex.Proc>
 function M.processes(text)
   if not text then
-    local out = vim.system({ "ps", "-axww", "-o", "pid=,ppid=,command=" }, { text = true }):wait()
-    text = out.code == 0 and out.stdout or ""
+    local out = run({ "ps", "-axww", "-o", "pid=,ppid=,command=" })
+    text = out and out.code == 0 and out.stdout or ""
   end
   local procs = {}
   for line in (text .. "\n"):gmatch("(.-)\n") do
@@ -73,14 +87,14 @@ end
 ---@return lex.Pane[]
 function M.panes_full(text)
   if not text then
-    local out = vim.system({
+    local out = run({
       "tmux",
       "list-panes",
       "-a",
       "-F",
       "#{pane_id}\t#{pane_pid}\t#{session_name}\t#{window_index}\t#{window_name}",
-    }, { text = true }):wait()
-    text = out.code == 0 and out.stdout or ""
+    })
+    text = out and out.code == 0 and out.stdout or ""
   end
   local rows = {}
   for line in (text .. "\n"):gmatch("(.-)\n") do
@@ -229,7 +243,7 @@ function M.by_open_files(paths, text)
     end
     -- lsof answers non-zero when any of the files is open by nobody, which
     -- is an ordinary answer here, so the text is read either way.
-    local res = vim.system(args, { text = true }):wait(5000)
+    local res = run(args, 5000)
     text = res and res.stdout or ""
   end
   local pid

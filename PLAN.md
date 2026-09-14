@@ -107,10 +107,11 @@ month after its last activity.
     things open the same snacks picker, in two scopes: the range (badge, menu
     item) or the file (chip, explorer). `<CR>` opens the session, `g` goes to
     the lines.
-12. **One menu item: `📌 Copy Lex Place`.** No *Add Lex Place* in version one:
+12. **One menu item: `📌 Pin Lex Place`.** No *Add Lex Place* in version one:
     a second paste into the same prompt does the same, Claude Code keeps both
     pastes. "Place" is Rex's word for the same thing; the robot said nothing
-    about memory.
+    about memory. (Named `📌 Copy Lex Place` until 2026-09-14, see decision
+    22.)
 13. **The record carries the process, the pane and the transcript.** The hook
     sees its parent pid (the `claude` process, measured through `sh -c` and in
     exec form), `$TMUX_PANE` (inherited, the inbox hook already relies on it)
@@ -130,13 +131,13 @@ month after its last activity.
     `agent` field; the reader gets one table per agent: the resume command,
     and how to read the last turn. Running and jump come from `pid` and
     `pane`, the same for all three.
-16. **A file and a folder are places too.** From the explorer, `📌 Copy Lex
+16. **A file and a folder are places too.** From the explorer, `📌 Pin Lex
     Place` on a file row copies the whole-file block (no `lines`, no body),
     on a folder row a folder block (`dir` instead of `file`), and on a
     `<Tab>`-selection one block per row, files and folders mixed. One block
     per folder, however many files: the agent lists it, and the store holds
     one record that applies to every file under it. In a buffer, `ggVG` and
-    Copy make a whole-file block too; a body of 400 lines in the prompt
+    Pin make a whole-file block too; a body of 400 lines in the prompt
     helps nobody. The look, in a buffer: a bar on every row and no wash
     (Rex: a document is outlined, never filled); the badge on row 1 says
     `whole file`, or `folder docs/` when the place is a folder above. In the
@@ -156,7 +157,7 @@ month after its last activity.
     wash, the filled `💬 N` badge. Shape and color both change (Rex: color is
     never the only signal). The pending list lives in the nvim session,
     never in the store. It clears when the store gains the matching record
-    (nvim re-reads on `FocusGained` and on a file watch), when a Copy follows
+    (nvim re-reads on `FocusGained` and on a file watch), when a Pin follows
     a send, or on `:LexClear`. The turn from blue to yellow is the proof that
     the hook wrote the link. Rex's rule, kept: blue is your selection,
     yellow is the past, green is a session at work. Asked by Lukas
@@ -227,6 +228,17 @@ month after its last activity.
     `d` in the picker, or its right-click menu, removes a conversation, or
     one of its places, after a confirm. Decided with Lukas 2026-09-12.
 
+22. **The item is `📌 Pin Lex Place`, not `📌 Copy Lex Place`.** Lukas,
+    2026-09-14: the item pins a place more than it copies one. And the popup
+    already carries nvim's own `Copy` a few rows lower, so the menu showed
+    two items with the same verb. Pin is what the item leaves on screen: the
+    `📌 n` badge and the dashed blue bar of a pending place (decision 17).
+    The clipboard half is still said, by the notification (`Lex: copied
+    …`). Only the label changed; `:LexCopy`, `lex.copy` and the block did
+    not. Rejected: *Mark* (the mark is Lex's yellow history bar,
+    decision 11, and vim has marks of its own), *Send to Agent* (nothing is
+    sent), *Pin for Agent* (drops the name Lex from a shared popup).
+
 Rejected earlier in the same brainstorm, so nobody proposes them again:
 
 | Alternative | Why not |
@@ -244,7 +256,7 @@ Unchanged from today, and that is the point:
 
 1. In LazyVim, select lines (or stand on one line, or right-click a file or
    a folder row in the explorer, or `<Tab>`-select several rows).
-2. Right-click → **📌 Copy Lex Place**. The clipboard now holds one or more
+2. Right-click → **📌 Pin Lex Place**. The clipboard now holds one or more
    `<lex-place>` blocks.
 3. Paste into any Claude Code session's prompt. Paste again for a second
    file. Type the question below. Send.
@@ -311,14 +323,16 @@ Rules:
 ## The store
 
 ```
-$LEX_HOME/<repo-slug>/links.jsonl        $LEX_HOME defaults to ~/.lex
+$LEX_HOME/<readable-repo>--<hash>/links.jsonl   $LEX_HOME defaults to ~/.lex
 ```
 
-`<repo-slug>` is `repo` with every character that is not an ASCII letter or
-digit turned into `-`, the same rule Claude Code uses for
-`~/.claude/projects/` (`/aaa/.worktrees` becomes `-aaa--worktrees`). One file
-per repository keeps reads small. `$LEX_HOME` exists for the tests and the
-health check, which write into a temporary store.
+The readable part collapses every non-ASCII-alphanumeric run to `-`, is capped
+at 48 bytes, and is followed by the first 16 SHA-256 hex characters of the
+exact `repo`. The hash prevents paths such as `/a-b/c` and `/a/b-c` from
+sharing a file. Readers still require the exact `repo` field. Stores from
+0.1.0 are copied lazily from their old lossy directory, with exact filtering.
+One file per repository keeps reads small. `$LEX_HOME` exists for the tests
+and health check, which write into a temporary store.
 
 One JSON object per line, appended by the hook, one per place per prompt:
 
@@ -340,7 +354,7 @@ One JSON object per line, appended by the hook, one per place per prompt:
 | `pid` | the `claude` process, the hook's parent | nvim: `working…` needs the session's state file to say `working` and `vim.uv.kill(pid, 0)` to say alive; the pid alone proved nothing, an idle agent waiting for the next prompt is a living process (seen on screen 2026-09-12) |
 | `pane` | `$TMUX_PANE` as the hook saw it, or absent outside tmux | the jump: `tmux select-window -t <pane>`; the opener adapter on this machine adds the yabai space |
 | `transcript` | `transcript_path` from the hook input (Claude Code, Codex); absent for OpenCode, whose sessions live in SQLite | the picker preview (last turn), and the `gone` state when the file is missing |
-| `repo` | from the block; the value the file is keyed by, kept in the record too because the slug is lossy (`a/b` and `a-b` share one) | a repo-wide picker, later |
+| `repo` | from the block; the exact value used to hash the store directory and checked again by readers | a repo-wide picker and collision-safe reads |
 | `cwd`, `path`, `file`, `from`, `to`, `lang` | from the block; `from`/`to` absent for a whole file | nvim, the mark |
 | `dir` | from a folder block; then `file`, `from`, `to`, `lang`, `body`, `before`, `after`, `head`, `tail`, `hash` are absent | nvim: the record applies to every file under `dir`, and to the folder row in the explorer |
 | `body` | the block's body, byte for byte: the lines the conversation saw; absent for a whole file or a folder | re-anchor (`lua/lex/anchor.lua`): exact, then fuzzy; the picker preview when the text is gone |
@@ -353,13 +367,11 @@ One JSON object per line, appended by the hook, one per place per prompt:
 
 - Append-only, one `write()` per record, each record one line. Many sessions
   write at once; a record is never rewritten.
-- **Forget** is the one exception (`store.forget`, 2026-09-12): it reads the
-  file, drops the records of a conversation or of one of its places, writes a
-  temporary file and moves it into place, all under a lock file that only
-  editors take. A writer never waits on an editor, so a record appended
-  between the read and the move would be lost; the size is compared after the
-  write and the work is redone when it changed. The agent's own history is
-  never touched, only Lex's memory of where it looked.
+- **Forget** appends a tombstone (`store.forget`, revised 2026-09-12). It names
+  a session and optionally one place key, and removes only matching records
+  that precede it when read. A later prompt in the same session is visible.
+  Because the file is never replaced, a simultaneous writer append cannot be
+  lost. The agent's own history is never touched, only Lex's memory.
 - The store holds where the text was; the editor finds where it is. A file
   edit never updates a record (*The nvim side*, 1): the current position is
   a value the editor derives from `head`, `tail` and `hash` and keeps in an
@@ -417,7 +429,7 @@ not run.
 | The prompt hook | `UserPromptSubmit`, JSON on stdin | `UserPromptSubmit`, JSON on stdin, hooks on by default | plugin hook `chat.message`, called in-process before the message is saved |
 | The session signals | `SessionStart`, `Stop`, `SessionEnd`, the same command; the hook branches on `hook_event_name` | the same three, the same command; a new entry means pressing `t` once more | `session.idle` in the plugin's `event` hook, and `dispose` |
 | Fields | `session_id`, `cwd`, `prompt`, `transcript_path`, `prompt_id`, `permission_mode`, `hook_event_name` | `session_id`, `cwd`, `prompt`, `transcript_path`, `turn_id`, `model`, `permission_mode`, `hook_event_name` | `input.sessionID`, `output.parts[].text` (the full prompt), `input.agent`, `input.model` |
-| Where the hook is declared | `~/.claude/settings.json`, exec form with `args`, no shell | `[[hooks.UserPromptSubmit]]` in `~/.codex/config.toml`, the one shape Codex 0.153 accepts (mac-setup measured two others that parse and are ignored); one shell line, no exec form; a new command must be trusted once with `t` in the TUI | `~/.config/opencode/plugin/lex.ts` (singular `plugin/`, the folder OpenCode 1.18 reads on this machine), or `plugin: ["opencode-lex"]` in `opencode.json` (npm, installed by Bun at startup) |
+| Where the hook is declared | `~/.claude/settings.json`, exec form with `args`, no shell | documented nested `[[hooks.UserPromptSubmit]]` / `[[hooks.UserPromptSubmit.hooks]]` tables in `~/.codex/config.toml`; one shell command; a new command must be trusted once with `t` in the TUI | `~/.config/opencode/plugin/lex.ts` (singular `plugin/`, the folder OpenCode 1.18 reads on this machine), or `plugin: ["opencode-lex"]` in `opencode.json` (npm, installed by Bun at startup) |
 | The writer | `agents/claude-code/hook.lua`, run as `nvim -l` | the same Lua file, run as `nvim -l … --agent codex` | `agents/opencode/index.ts`, Bun, writes the JSONL itself |
 | Environment | inherited; `$TMUX_PANE` present | a snapshot of the codex process env; `$TMUX_PANE` present | the plugin runs inside the opencode process; `process.env` |
 | The parent pid | `claude`, measured 2026-09-11 (`ps -o comm=` on the hook's parent under a real `claude -p`) | the `codex` TUI, or the app-server daemon when a reusable daemon socket exists; not measured | `process.pid`, the opencode process |
@@ -495,12 +507,12 @@ form, which spawns the program with no shell on every OS, including Windows:
 - `:checkhealth lex` reports the nvim path, the hook file, each agent's
   entry, the store (repositories, links, `hook.log`), and one dry run of the
   writer with the contract prompt, timed.
-- `:LexInstallHook` writes two entries, `UserPromptSubmit` and `Stop`, the
-  same command; the hook reads `hook_event_name`. `:LexInstallHook codex`
-  appends one `[[hooks.UserPromptSubmit]]` and one `[[hooks.Stop]]` block to
-  `~/.codex/config.toml` after a backup, with the same command as one shell
-  line plus `--agent codex`; a config from before the Stop hook gets only the
-  block it lacks. `:LexInstallHook opencode` copies
+- `:LexInstallHook` writes four entries: `UserPromptSubmit`, `Stop`,
+  `SessionStart`, and `SessionEnd`; the hook reads `hook_event_name`.
+  `:LexInstallHook codex` appends the documented parent and nested handler
+  tables for the same four events to `~/.codex/config.toml` after a backup,
+  with the command as one shell line plus `--agent codex`; it also recognizes
+  Lex 0.1.0's inline-array form to avoid duplicates. `:LexInstallHook opencode` copies
   `agents/opencode/index.ts` to `~/.config/opencode/plugin/lex.ts`, and
   copies again when the source changed. Each is idempotent.
 - Measured 2026-09-11: a settings file the installer wrote, given to a real
@@ -578,16 +590,16 @@ readable.
    `orphaned` until step two reads `git log --follow`.
 2. **The badge layer.** `CursorMoved` redraws the badges of the ranges in view.
    Cheap: one extmark per range.
-2b. **The pending list.** Copy appends `{ file | dir, from, to, n }`.
+2b. **The pending list.** Pin appends `{ file | dir, from, to, n }`.
    `FocusGained` and a `vim.uv.new_fs_event` on the repo's `links.jsonl`
    re-read the store; an entry whose record has arrived is dropped, and the
-   yellow mark takes its place. `:LexClear` empties the list. A Copy after
+   yellow mark takes its place. `:LexClear` empties the list. A Pin after
    a send starts a new list at `1`.
 3. **The click.** On a marked row the right-click menu gets **💬 N
    conversations**, drawn only when the row has links — the same per-click
    rebuild `ai-ref.lua` uses for *Open in Browser*. A keymap does the same
    from the keyboard. A click on the badge does the same for that range. In
-   the explorer the same two items sit on file rows and folder rows: Copy
+   the explorer the same two items sit on file rows and folder rows: Pin
    makes the whole-file or folder block, and the count opens the picker in
    file or folder scope.
 4. **The picker.** A snacks picker, one row per conversation (decision 21),
@@ -666,10 +678,17 @@ readable.
    what one mouse button opens (Lukas, 2026-09-12). Left click opens the
    file's picker, right click the whole project's, the split the rest of
    Lukas's bar already uses; in a buffer that is not a file it reads
-   `💬 -/12` and either button opens the project. This is the visual way
+   `💬 -/12` and either button opens the project. The two pickers say which
+   one they are right after `Lex`, before a path that can be cut:
+   `Lex · this file · tutorial/…/README.md` and
+   `Lex · whole project · ai-evaluation` (Lukas, 2026-09-14, "I see on the
+   first sight if I see comments just for one file or for all files"); a
+   range reads `Lex · line 42 · README.md`, a folder `Lex · folder · docs/`.
+   This is the visual way
    into the project-wide list, so nobody has to remember `:LexLinks repo`.
-   The project number is cached until the store file changes, because a
-   status bar asks on every redraw.
+   The project number is cached until the store changes or for 60 seconds,
+   whichever comes first. The expiry lets a deleted transcript disappear
+   from the count even when the append-only link store did not change.
 7. **Explorer.** A count per file and per folder place, in the right slot
    next to the git status letter, through the explorer `format` hook that
    already emits raw chunks there (mac-setup, `plugins/snacks.lua`). `?N`
@@ -678,7 +697,7 @@ readable.
    shading uses; the folder tint recolors the name and icon chunks the way
    the repo-root purple does.
 8. **Step two.** Hierarchy selection (the "widen selection" key); a "forget
-   this link" command (rewrites the file under a lock); `additionalContext` on
+   this link" command (appends a tombstone); `additionalContext` on
    by option; a repo-wide picker scope.
 
 ### `<CR>`: back into the conversation

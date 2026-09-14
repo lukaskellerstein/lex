@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        neovim: [v0.11.4, stable]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: rhysd/action-setup-vim@v1
+        with:
+          version: ${{ matrix.neovim }}
+          neovim: true
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+      - run: sh tests/run.sh

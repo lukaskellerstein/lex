@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="title desc">
+  <title id="title">Lex marks and conversation picker</title>
+  <desc id="desc">A dark Neovim-style editor showing linked code beside a conversation picker.</desc>
+  <rect width="1200" height="470" rx="18" fill="#101216"/>
+  <rect x="18" y="18" width="1164" height="434" rx="12" fill="#171a20" stroke="#30353f"/>
+  <circle cx="42" cy="42" r="6" fill="#ff6b6b"/><circle cx="62" cy="42" r="6" fill="#eacb4a"/><circle cx="82" cy="42" r="6" fill="#66ad93"/>
+  <text x="106" y="48" fill="#8d96a8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15">src/auth.ts — lex.nvim</text>
+  <line x1="610" y1="64" x2="610" y2="433" stroke="#30353f"/>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">
+    <text x="43" y="101" fill="#5f6878">10</text><text x="80" y="101" fill="#c7cdd8">type User = { email: string }</text>
+    <rect x="69" y="119" width="521" height="91" rx="4" fill="#2f2c1b"/>
+    <rect x="69" y="119" width="4" height="91" fill="#eacb4a"/>
+    <text x="43" y="145" fill="#5f6878">12</text><text x="80" y="145" fill="#c792ea">export function</text><text x="226" y="145" fill="#82aaff"> login</text><text x="280" y="145" fill="#c7cdd8">(user: User) {</text>
+    <text x="43" y="176" fill="#5f6878">13</text><text x="80" y="176" fill="#c7cdd8">  return retry(() =&gt; post(</text><text x="337" y="176" fill="#c3e88d">"/auth"</text><text x="407" y="176" fill="#c7cdd8">, user))</text>
+    <text x="43" y="202" fill="#5f6878">14</text><text x="80" y="202" fill="#c7cdd8">}</text>
+    <rect x="489" y="130" width="88" height="29" rx="6" fill="#3d381f"/><text x="505" y="150" fill="#eacb4a" font-weight="700">💬 3</text>
+    <text x="43" y="246" fill="#5f6878">16</text><text x="80" y="246" fill="#6e7681">// The code keeps the reason.</text>
+    <rect x="69" y="271" width="521" height="58" rx="4" fill="#232b36"/>
+    <rect x="69" y="271" width="4" height="58" fill="#8fb4f0"/>
+    <text x="43" y="301" fill="#5f6878">18</text><text x="80" y="301" fill="#c7cdd8">const timeout = 5000</text>
+    <text x="498" y="301" fill="#8fb4f0" font-weight="700">📌 1</text>
+    <text x="638" y="96" fill="#eacb4a" font-weight="700">Conversations here</text>
+    <rect x="628" y="116" width="526" height="72" rx="7" fill="#252a32" stroke="#eacb4a"/>
+    <text x="646" y="143" fill="#c7cdd8">Claude Code  ·  f357503d  ·  12m</text>
+    <text x="646" y="169" fill="#eacb4a">Why does login retry twice?</text>
+    <text x="646" y="222" fill="#c7cdd8">Codex        ·  01a092bb  ·  2h</text>
+    <text x="646" y="250" fill="#8d96a8">Check whether this can race</text>
+    <text x="646" y="301" fill="#c7cdd8">OpenCode     ·  7c3e1a    ·  3d</text>
+    <text x="646" y="329" fill="#66ad93">working…</text>
+    <line x1="628" y1="365" x2="1154" y2="365" stroke="#30353f"/>
+    <text x="646" y="399" fill="#8d96a8">↵ agent   g code   d forget   q close</text>
+  </g>
+</svg>

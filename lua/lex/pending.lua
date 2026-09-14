@@ -1,6 +1,6 @@
 -- lex.pending: the places copied and not yet sent.
 --
--- `📌 Copy Lex Place` appends one entry and gets its number back; the number
+-- `📌 Pin Lex Place` appends one entry and gets its number back; the number
 -- goes into the block as `n`, so the pending mark, the block and the record
 -- say the same "place 2". When the record arrives in the store, the entry is
 -- dropped and the yellow mark takes its place. When the list empties that
